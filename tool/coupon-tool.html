@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>検定クーポン発行ツール</title>
+<style>
+  :root { --main:#1f5fbf; --bg:#f4f6fa; --line:#d5dbe5; --ok:#1d7a3e; --ng:#b3261e; --wait:#a15c00; --del:#6a3fb5; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Yu Gothic UI","Meiryo",sans-serif; background:var(--bg); color:#222; font-size:16px; }
+  header { background:var(--main); color:#fff; padding:14px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:20px; margin:0; }
+  #who { margin-left:auto; font-size:14px; opacity:.9; }
+  nav { display:flex; gap:4px; padding:0 24px; background:#fff; border-bottom:1px solid var(--line); }
+  nav button { border:none; background:none; padding:14px 20px; font-size:16px; cursor:pointer; border-bottom:3px solid transparent; }
+  nav button.active { border-bottom-color:var(--main); color:var(--main); font-weight:bold; }
+  nav .badge { background:var(--wait); color:#fff; border-radius:10px; padding:1px 8px; font-size:12px; margin-left:4px; }
+  main { max-width:1280px; margin:24px auto; padding:0 16px; }
+  section { display:none; background:#fff; border:1px solid var(--line); border-radius:8px; padding:24px; }
+  section.active { display:block; }
+  #tab-settings { max-width:960px; margin:0 auto; }
+  #tab-issue { max-width:1200px; margin:0 auto; }
+  #tab-issue .grid { max-width:960px; }
+  #cartTable td, #cartTable th { white-space:nowrap; }
+  .grid { display:grid; grid-template-columns: 200px 1fr; gap:14px 16px; align-items:center; }
+  .grid label { font-weight:bold; }
+  .req::after { content:" ＊必須"; color:var(--ng); font-size:12px; font-weight:normal; }
+  input, select, textarea { font-size:16px; padding:8px 10px; border:1px solid #aab3c2; border-radius:6px; width:100%; font-family:inherit; }
+  input::placeholder { color:#b0b6c0; font-style:italic; }
+  input.missing { border:2px solid var(--ng); background:#fff5f5; }
+  .hint { font-size:13px; color:#666; }
+  .preview { font-family: Consolas, monospace; font-size:20px; background:#eef3fb; padding:10px 14px; border-radius:6px; letter-spacing:.5px; }
+  .btn { background:var(--main); color:#fff; border:none; border-radius:8px; padding:14px 32px; font-size:18px; cursor:pointer; text-decoration:none; display:inline-block; }
+  .btn:disabled { background:#9aa7bb; cursor:wait; }
+  .btn.sub { background:#fff; color:var(--main); border:1px solid var(--main); padding:8px 16px; font-size:15px; }
+  .btn.sm { padding:4px 10px; font-size:13px; white-space:nowrap; margin:2px 0; }
+  .btn.go { background:var(--ok); color:#fff; border:1px solid var(--ok); }
+  .btn.warn { background:#fff; color:var(--ng); border:1px solid var(--ng); }
+  .btn.plain { background:#fff; color:#444; border:1px solid #999; }
+  .actions { margin-top:24px; text-align:center; }
+  .msg { margin:16px 0 0; padding:12px 16px; border-radius:6px; display:none; white-space:pre-wrap; }
+  .msg.ok { display:block; background:#e6f4ea; color:var(--ok); }
+  .msg.ng { display:block; background:#fce8e6; color:var(--ng); font-weight:bold; }
+  .msg.info { display:block; background:#eef3fb; color:#234; }
+  .result { margin-top:20px; padding:16px; border:2px dashed var(--wait); border-radius:8px; background:#fff8ec; }
+  .result code { font-size:16px; }
+  .result .warnline { color:var(--wait); font-weight:bold; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { border-bottom:1px solid var(--line); padding:8px 6px; text-align:left; vertical-align:top; }
+  th { background:#f0f3f8; position:sticky; top:0; z-index:1; }
+  td code { font-size:14px; white-space:nowrap; }
+  td.nw { white-space:nowrap; }
+  .st { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:bold; white-space:nowrap; }
+  .st.done { background:#e6f4ea; color:var(--ok); }
+  .st.wait { background:#fff0d6; color:var(--wait); }
+  .st.chg  { background:#fce8e6; color:var(--ng); }
+  .st.del  { background:#efe6fb; color:var(--del); }
+  .st.gone { background:#eee; color:#666; }
+  .sub { font-size:12px; color:#666; margin-top:3px; }
+  tr.muted td { color:#888; }
+  .toolbar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+  .toolbar input[type=search] { flex:1; min-width:200px; }
+  .toolbar select { width:auto; }
+  .tablewrap { max-height:65vh; overflow:auto; }
+  h2 { font-size:18px; margin-top:0; }
+  h3 { font-size:16px; margin:28px 0 10px; border-left:4px solid var(--main); padding-left:8px; }
+  .row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .row input[type=date] { width:220px; }
+  .row select { width:220px; }
+  .row .fUsers { width:90px; text-align:right; }
+  .row .unit { flex:none; font-size:14px; color:#444; }
+  .row .fEmail { width:220px; }
+  .row .x { background:#fff; border:1px solid #bbb; color:#666; border-radius:6px; width:36px; height:36px; cursor:pointer; flex:none; }
+  tr.dup td { background:#fff1f0; }
+  .ngtext { color:var(--ng); font-weight:bold; font-size:13px; }
+  .oktext { color:var(--ok); font-size:13px; }
+  .result table { background:#fff; margin-top:8px; }
+  .flow { background:#f6f8fc; border:1px solid var(--line); border-radius:6px; padding:10px 14px; font-size:14px; margin-bottom:18px; }
+  #sMsg.ng { color:var(--ng); font-size:15px; font-weight:bold; background:#fce8e6; padding:10px 14px; border-radius:6px; }
+  #sMsg.ok { color:var(--ok); font-size:15px; font-weight:bold; background:#e6f4ea; padding:10px 14px; border-radius:6px; }
+
+  /* ---- コンパクト表示 ---- */
+  body { font-size:14px; }
+  header { padding:8px 20px; } header h1 { font-size:17px; }
+  nav button { padding:9px 16px; font-size:14px; }
+  main { margin:14px auto; }
+  section { padding:16px 20px; }
+  h2 { font-size:16px; margin-bottom:8px; }
+  h3 { font-size:14px; margin:16px 0 8px; }
+  .flow { padding:6px 10px; font-size:12.5px; margin-bottom:10px; }
+  .grid { grid-template-columns:170px 1fr; gap:6px 12px; }
+  .grid label { font-size:13.5px; }
+  input, select, textarea { font-size:14px; padding:4px 8px; border-radius:4px; }
+  .row { margin-bottom:4px; gap:6px; }
+  .row input[type=date], .row select { width:180px; }
+  .row .fUsers { width:72px; } .row .fEmail { width:190px; }
+  .row .x { width:28px; height:28px; }
+  .hint { font-size:12px; margin-top:2px; }
+  .preview { font-size:16px; padding:4px 10px; }
+  .btn { padding:8px 24px; font-size:15px; border-radius:6px; }
+  .btn.sub { padding:5px 12px; font-size:13px; }
+  .btn.sm { padding:2px 8px; font-size:12px; }
+  .actions { margin-top:12px; }
+  .msg { margin-top:10px; padding:8px 12px; }
+  th, td { padding:5px 6px; font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎫 検定クーポン発行ツール</h1>
+  <span id="who">未接続</span>
+</header>
+<nav>
+  <button data-tab="issue" class="active">① クーポンを発行する</button>
+  <button data-tab="ledger">② 発行済み一覧・確認状況 <span id="waitBadge" class="badge" style="display:none"></span></button>
+  <button data-tab="settings">⚙ 設定</button>
+</nav>
+
+<main>
+<!-- 発行 -->
+<section id="tab-issue" class="active">
+  <h2>クーポンを発行する</h2>
+  <div class="flow">流れ：<b>① 入力して「発行リストに追加」</b>（何回でも追加できます） → <b>② 発行リストを確認して「まとめて発行」</b>（1つの確認依頼＝PR になります） → ③ 部内の誰かが GitHub で確認・承認 → <b>④ 一覧で「マージして確定」</b> → ⑤ お客様へ送付</div>
+
+  <h3>1. 発行内容を入力</h3>
+  <div class="grid">
+    <label for="fProduct" class="req">検定</label>
+    <select id="fProduct"></select>
+
+    <label class="req">受検日</label>
+    <div><div id="dateList"></div>
+      <button class="btn sm sub" id="btnAddDate" type="button">＋ 受検日を追加</button>
+      <div class="hint">今日以降の日付を選んでください。複数日開催のときは「受検日を追加」で増やします</div></div>
+
+    <label class="req">配布先（組織名・区分・利用者数）</label>
+    <div><div id="orgList"></div>
+      <button class="btn sm sub" id="btnAddOrg" type="button">＋ 配布先を追加</button>
+      <div class="hint">Excel などから「組織名」または「組織名｜利用者数」の2列を複数行コピーして、組織名の欄に貼り付けると、行ごとに分かれて入ります</div></div>
+
+    <label for="fDiscount" class="req">割引内容</label>
+    <select id="fDiscount"></select>
+
+    <label for="fExpires" class="req">有効期限日</label>
+    <div><input type="date" id="fExpires" style="width:220px"><div class="hint">この画面で追加するクーポンすべてに付きます。受検日より前の日付にはできません</div></div>
+
+    <label for="fRequester">依頼元・用途</label>
+    <div><input id="fRequester" list="requesterList" placeholder="例）営業部"><datalist id="requesterList"></datalist>
+    <div class="hint">クリックすると候補（テスト・自部門・営業部など）が出ます。自由に入力もできます</div></div>
+
+    <label for="fNote">メモ</label>
+    <div><input id="fNote" placeholder="空欄なら「検定 配布先名」が自動で入ります">
+    <div class="hint" id="noteHint">空欄のままなら、配布先ごとに「検定 配布先名」（例：クラウド検定ベーシック 株式会社サンプル）が入ります。入力した場合は、入力した内容がすべての配布先に入ります</div></div>
+
+    <label>コードの見本</label>
+    <div class="preview" id="preview"></div>
+  </div>
+  <div class="actions"><button class="btn" id="btnAdd">発行リストに追加</button></div>
+  <div id="msg" class="msg"></div>
+
+  <h3 id="cartTitle">2. 発行リスト</h3>
+  <div class="hint">発行リストはこのパソコンに保存されます。途中で閉じても、続きから発行できます。</div>
+  <div class="tablewrap" style="margin-top:8px"><table id="cartTable"></table></div>
+  <div class="actions">
+    <button class="btn sub" id="btnClearCart">リストを空にする</button>
+    <button class="btn" id="btnIssue">まとめて発行して確認を依頼する</button>
+  </div>
+  <div id="cartMsg" class="msg"></div>
+  <div class="result" id="result" style="display:none"></div>
+</section>
+
+<!-- 一覧 -->
+<section id="tab-ledger">
+  <h2>発行済み一覧・確認状況</h2>
+  <div class="toolbar">
+    <select id="lStatus">
+      <option value="active">取り下げを除く</option>
+      <option value="wait">確認待ち・差し戻し</option>
+      <option value="done">確定</option>
+      <option value="del">削除確認待ち</option>
+      <option value="gone">取り下げ</option>
+      <option value="all">すべて</option>
+    </select>
+    <input type="search" id="lSearch" placeholder="コード・組織名・依頼元などで検索">
+    <button class="btn sub" id="btnReload">最新にする</button>
+    <button class="btn sub" id="btnCsv">台帳CSV（Excel用）</button>
+    <button class="btn" id="btnImportCsv" style="padding:8px 16px;font-size:15px">取り込み用CSV（表示中の確定分）</button>
+  </div>
+  <div class="hint" id="lCount"></div>
+  <div id="lMsg" class="msg"></div>
+  <div class="tablewrap"><table id="lTable"></table></div>
+</section>
+
+<!-- 設定 -->
+<section id="tab-settings">
+  <h2>設定</h2>
+  <p class="hint">管理者が最初に一度だけ設定します。ふだん使う人は触らなくて大丈夫です。</p>
+  <div class="grid">
+    <label for="sApi">API の URL</label>
+    <div><input id="sApi" placeholder="例）https://api.github.com"><div class="hint">GHES は https://ホスト名/api/v3 、github.com は https://api.github.com</div></div>
+
+    <label for="sOwner">オーナー（組織名）</label>
+    <input id="sOwner" placeholder="例）learning-support">
+
+    <label for="sRepo">リポジトリ名</label>
+    <input id="sRepo" placeholder="例）coupon-ledger">
+
+    <label for="sBranch">ブランチ</label>
+    <input id="sBranch" placeholder="例）main">
+
+    <label for="sDir">クーポンを置くフォルダ</label>
+    <div><input id="sDir" placeholder="例）coupons"><div class="hint">1クーポン＝1ファイルで「フォルダ/発行年/コード.json」に保存します</div></div>
+
+    <label for="sConfig">選択肢の設定ファイル</label>
+    <div><input id="sConfig" placeholder="例）coupons/config.json"><div class="hint">検定・区分・割引の選択肢。無ければツール内の初期値を使います</div></div>
+
+    <label for="sToken">個人アクセストークン</label>
+    <div><input id="sToken" type="password" placeholder="例）github_pat_..."><div class="hint">このパソコンのブラウザにだけ保存されます。リポジトリの読み書きと Pull request の作成・マージ権限が必要です</div></div>
+  </div>
+  <div class="actions"><button class="btn" id="btnSave">保存して接続テスト</button></div>
+  <div id="sMsg" style="margin-top:12px;white-space:pre-wrap"></div>
+</section>
+</main>
+
+<script>
+"use strict";
+/* ============================================================
+ * 管理者向け: 部員に配る前にここを書き換えておくと、
+ * 部員はトークンを入れるだけで使えます。
+ * ============================================================ */
+const DEFAULT_SETTINGS = {
+  api: "",              // 例 "https://api.github.com" / "https://github.example.co.jp/api/v3"
+  owner: "",
+  repo: "",
+  branch: "main",
+  dir: "coupons",
+  config: "coupons/config.json",
+};
+
+// config.json が無いときの選択肢
+const DEFAULT_CONFIG = {
+  products: [
+    { code: "scb", label: "クラウド検定ベーシック" },
+    { code: "sca", label: "クラウド検定アドバンス" },
+    { code: "sai", label: "さくらのAI検定" },
+  ],
+  categories: [
+    { code: "biz", label: "企業" },
+    { code: "ptn", label: "パートナー企業" },
+    { code: "grp", label: "グループ企業" },
+    { code: "usr", label: "個人" },
+    { code: "edu", label: "教育機関" },
+  ],
+  // type: percent（パーセント割引） / fixed_cart（金額割引）。value は割引率(%) または割引金額(円)
+  discounts: [
+    { label: "受験料 100%割引", type: "percent", value: 100 },
+    { label: "受験料 50%割引", type: "percent", value: 50 },
+    { label: "受験料 3,000円引き", type: "fixed_cart", value: 3000 },
+  ],
+  requesters: [ "テスト", "自部門", "営業部" ],
+  randomLength: 8,
+  // 紛らわしい文字 (0,o,1,l,i) を除いた英小文字＋数字
+  randomChars: "abcdefghjkmnpqrstuvwxyz23456789",
+};
+
+const COLUMNS = ["code","product","exam_date","expires_on","category","issued_at","issued_by",
+  "recipient_org","max_users","email_restriction","requester","discount","discount_type","discount_value","note"];
+
+// 割引の選択肢を { label, type, value } にそろえる（"受験料 50%割引" のような文字だけの旧形式にも対応）
+function normalizeDiscount(d) {
+  if (d && typeof d === "object") return { label: String(d.label ?? ""), type: d.type, value: Number(d.value) };
+  const t = String(d ?? "").normalize("NFKC");
+  let m = t.match(/([\d.]+)\s*%/);           if (m) return { label: String(d), type: "percent", value: +m[1] };
+  m = t.match(/([\d,]+)\s*円/);              if (m) return { label: String(d), type: "fixed_cart", value: +m[1].replace(/,/g, "") };
+  return { label: String(d ?? ""), type: "", value: NaN };
+}
+const discountOf = (label) => (cfg.discounts.find(d => d.label === label) || normalizeDiscount(label));
+
+/* ---------- 小物 ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const pad = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const nowIso = () => { const d = new Date(); return `${ymd(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, def) { try { const v = localStorage.getItem(k); return v == null ? def : JSON.parse(v); } catch { return def; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str); let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64decode(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ""));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+async function pMap(items, fn, limit = 6) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); }
+  }));
+  return out;
+}
+
+/* ---------- コード生成・組織名 ---------- */
+function randomString(len, chars) {
+  const out = []; const max = 256 - (256 % chars.length);
+  while (out.length < len) {
+    const buf = new Uint8Array(len * 2); crypto.getRandomValues(buf);
+    for (const b of buf) { if (b < max && out.length < len) out.push(chars[b % chars.length]); }
+  }
+  return out.join("");
+}
+const datePart = (iso) => { const [y, m, d] = iso.split("-"); return y.slice(2) + m + d; };
+const buildCode = (product, isoDate, category) =>
+  `${product}${datePart(isoDate)}-${category}-${randomString(cfg.randomLength, cfg.randomChars)}`;
+// (株)・（株）・㈱ を「株式会社」に置き換える（保存する値にも使う）
+const fixOrgName = (s) => String(s ?? "").replace(/[(（]\s*株\s*[)）]|㈱/g, "株式会社").trim();
+// 組織名の表記ゆれ（(株)/株式会社・全角/半角・空白・大文字小文字）を吸収して比較する
+const normOrg = (s) => fixOrgName(String(s ?? "").normalize("NFKC")).replace(/\s+/g, "").toLowerCase();
+const productLabel = (code) => (cfg.products.find(p => p.code === code) || {}).label || code;
+const categoryLabel = (code) => (cfg.categories.find(p => p.code === code) || {}).label || code;
+
+/* ---------- GitHub API ---------- */
+class GitHub {
+  constructor(s) { this.s = s; this.base = s.api.replace(/\/+$/, ""); this.repo = `/repos/${encodeURIComponent(s.owner)}/${encodeURIComponent(s.repo)}`; }
+  async call(method, path, body, okStatuses = []) {
+    const r = await fetch(this.base + path, {
+      method, cache: "no-store",
+      headers: { "Authorization": `Bearer ${this.s.token}`, "Accept": "application/vnd.github+json",
+                 ...(body ? { "Content-Type": "application/json" } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!r.ok && !okStatuses.includes(r.status)) {
+      let detail = ""; try { detail = (await r.json()).message || ""; } catch {}
+      let hint = "";
+      if (r.status === 403 && /not accessible by personal access token/i.test(detail))
+        hint = "\n→ トークンの権限が足りません。「Contents」と「Pull requests」を両方「Read and write」にしてください。";
+      const e = new Error(`GitHub への ${method} が失敗しました（${r.status}）${detail ? "：" + detail : ""}${hint}`);
+      e.status = r.status; throw e;
+    }
+    if (r.status === 204) return null;
+    try { return await r.json(); } catch { return null; }
+  }
+  path(p) { return p.split("/").map(encodeURIComponent).join("/"); }
+  user() { return this.call("GET", "/user"); }
+  repoInfo() { return this.call("GET", this.repo); }
+  async readFile(p, ref) {
+    const j = await this.call("GET", `${this.repo}/contents/${this.path(p)}?ref=${encodeURIComponent(ref)}`, null, [404]);
+    if (!j || j.message === "Not Found" || j.content === undefined) return null;
+    return { text: b64decode(j.content), sha: j.sha };
+  }
+  async headSha(branch) { return (await this.call("GET", `${this.repo}/git/ref/heads/${this.path(branch)}`)).object.sha; }
+  createBranch(name, sha) { return this.call("POST", `${this.repo}/git/refs`, { ref: `refs/heads/${name}`, sha }); }
+  deleteBranch(name) { return this.call("DELETE", `${this.repo}/git/refs/heads/${this.path(name)}`, null, [404, 422]); }
+  async commitFiles(branch, files, message) {   // 複数ファイルを1コミットでブランチに入れる
+    const head = await this.headSha(this.s.branch);
+    const base = await this.call("GET", `${this.repo}/git/commits/${head}`);
+    const tree = await this.call("POST", `${this.repo}/git/trees`, { base_tree: base.tree.sha,
+      tree: files.map(f => ({ path: f.path, mode: "100644", type: "blob", content: f.text })) });
+    const commit = await this.call("POST", `${this.repo}/git/commits`, { message, tree: tree.sha, parents: [head] });
+    await this.createBranch(branch, commit.sha);
+  }
+  putFile(p, text, branch, message) { return this.call("PUT", `${this.repo}/contents/${this.path(p)}`, { message, content: b64encode(text), branch }); }
+  deleteFile(p, sha, branch, message) { return this.call("DELETE", `${this.repo}/contents/${this.path(p)}`, { message, sha, branch }); }
+  tree(branch) { return this.call("GET", `${this.repo}/git/trees/${this.path(branch)}?recursive=1`); }
+  async blob(sha) { return b64decode((await this.call("GET", `${this.repo}/git/blobs/${sha}`)).content); }
+  async pulls(state, pages = 10) {
+    const all = [];
+    for (let page = 1; page <= pages; page++) {
+      const list = await this.call("GET", `${this.repo}/pulls?state=${state}&base=${encodeURIComponent(this.s.branch)}&per_page=100&page=${page}&sort=updated&direction=desc`);
+      all.push(...list); if (list.length < 100) break;
+    }
+    return all;
+  }
+  createPull(title, head, body) { return this.call("POST", `${this.repo}/pulls`, { title, head, base: this.s.branch, body }); }
+  closePull(n) { return this.call("PATCH", `${this.repo}/pulls/${n}`, { state: "closed" }); }
+  reviews(n) { return this.call("GET", `${this.repo}/pulls/${n}/reviews?per_page=100`); }
+  merge(n, title) { return this.call("PUT", `${this.repo}/pulls/${n}/merge`, { commit_title: title }); }
+}
+
+/* ---------- 状態 ---------- */
+let settings = { ...DEFAULT_SETTINGS, ...store.get("coupon.settings", {}) };
+let gh = null, cfg = DEFAULT_CONFIG, me = null;   // me = { login, label }
+let records = [];                                 // 一覧（確定・確認待ち・削除確認待ち・取り下げ）
+
+/* ---------- PR 本文 ---------- */
+const MARK = /<!-- coupon-data:([A-Za-z0-9+/=]+) -->/;
+const cell = (v) => String(v ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+const REVIEW_GUIDE = `### 確認者の方へ\n- 問題なければ「Files changed」→「Review changes」→ **Approve** を選んで送信してください。\n` +
+  `- 誤りがあれば **Request changes** を選び、どの行が違うかコメントしてください。\n` +
+  `- マージは発行者がツールから行います（確認者はマージしないでください）。\n\n`;
+const marker = (obj) => `<!-- coupon-data:${b64encode(JSON.stringify(obj))} -->`;
+function prBodyIssue(recs) {
+  const r0 = recs[0];
+  return `## 🎫 クーポン発行の確認依頼（${recs.length}件）\n\n依頼内容（メール・チャットなど）と見比べて確認してください。\n\n` +
+    `- 発行者：${cell(r0.issued_by)}　発行日時：${cell(r0.issued_at)}\n\n` +
+    `| # | コード | 検定 | 受検日 | 有効期限日 | 配布先（組織名） | 区分 | 利用者数 | メール制限 | 割引内容 | 依頼元・用途 | メモ |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n` +
+    recs.map((r, i) => `| ${i + 1} | \`${r.code}\` | ${cell(productLabel(r.product))} | ${r.exam_date} | ${cell(r.expires_on || "-")} | ${cell(r.recipient_org)} | ` +
+      `${cell(categoryLabel(r.category))} | ${cell(r.max_users ? r.max_users + "名" : "-")} | ${cell(r.email_restriction || "-")} | ${cell(r.discount)} | ${cell(r.requester || "-")} | ${cell(r.note || "-")} |`).join("\n") +
+    `\n\n${REVIEW_GUIDE}${marker({ kind: "issue", records: recs })}`;
+}
+function prBodyDelete(rec, reason) {
+  const rows = [["コード", "`" + rec.code + "`"], ["検定", productLabel(rec.product)], ["区分", categoryLabel(rec.category)],
+    ["受検日", rec.exam_date], ["有効期限日", rec.expires_on || "-"], ["配布先（組織名）", rec.recipient_org],
+    ["利用者数", rec.max_users ? rec.max_users + "名" : "-"], ["メール制限", rec.email_restriction || "-"], ["依頼元・用途", rec.requester || "-"],
+    ["割引内容", rec.discount], ["メモ", rec.note || "-"], ["発行者", rec.issued_by], ["発行日時", rec.issued_at], ["削除申請者", rec.deleted_by]];
+  return `## 🗑 クーポン削除の確認依頼\n\n**削除理由：** ${cell(reason)}\n\n| 項目 | 内容 |\n|---|---|\n` +
+    rows.map(([k, v]) => `| ${k} | ${cell(v)} |`).join("\n") + `\n\n${REVIEW_GUIDE}${marker({ kind: "delete", records: [rec], reason })}`;
+}
+function parsePr(pr) {
+  const m = (pr.body || "").match(MARK); if (!m) return null;
+  try {
+    const d = JSON.parse(b64decode(m[1]));
+    d.records = d.records || (d.record ? [d.record] : []);   // 1件ずつだった旧形式にも対応
+    return d;
+  } catch { return null; }
+}
+function reviewState(pr, reviews) {
+  const latest = {};
+  for (const r of reviews) {
+    if (r.user?.login === pr.user?.login) continue;               // 作成者自身のレビューは数えない
+    if (["APPROVED","CHANGES_REQUESTED","DISMISSED"].includes(r.state)) latest[r.user.login] = r.state;
+  }
+  const approvers = Object.keys(latest).filter(k => latest[k] === "APPROVED");
+  const changers  = Object.keys(latest).filter(k => latest[k] === "CHANGES_REQUESTED");
+  return { approved: approvers.length > 0 && changers.length === 0, approvers, changers };
+}
+
+/* ---------- 一覧の読み込み ---------- */
+async function loadRecords() {
+  const [tree, open, closed] = await Promise.all([gh.tree(settings.branch), gh.pulls("open"), gh.pulls("closed", 1)]);
+  if (tree.truncated) console.warn("tree truncated");
+  const re = new RegExp(`^${settings.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/\\d{4}/[^/]+\\.json$`);
+  const files = tree.tree.filter(t => t.type === "blob" && re.test(t.path));
+  // ファイルの中身は変わらない（sha が同じなら同じ内容）ので、ブラウザに覚えておいて通信を減らす
+  const recs = await pMap(files, async (f) => {
+    const key = "coupon.blob:" + f.sha;
+    let rec = store.get(key, null);
+    if (!rec) { rec = JSON.parse(await gh.blob(f.sha)); store.set(key, rec); }
+    return { ...rec, _path: f.path, _sha: f.sha, status: "done" };
+  });
+  const byCode = new Map(recs.map(r => [r.code, r]));
+  const openReviews = await pMap(open, pr => gh.reviews(pr.number), 4);
+  open.forEach((pr, i) => {
+    const d = parsePr(pr); if (!d) return;
+    const rs = reviewState(pr, openReviews[i] || []);
+    for (const rec of d.records) {
+      if (d.kind === "issue" && !byCode.has(rec.code)) {
+        byCode.set(rec.code, { ...rec, status: rs.changers.length ? "chg" : "wait", pr, rs, prCount: d.records.length });
+      } else if (d.kind === "delete" && byCode.has(rec.code)) {
+        Object.assign(byCode.get(rec.code), { status: "del", pr, rs, reason: d.reason, prCount: d.records.length });
+      }
+    }
+  });
+  for (const pr of closed) {
+    if (pr.merged_at) continue;
+    const d = parsePr(pr);
+    if (d && d.kind === "issue") for (const rec of d.records)
+      if (!byCode.has(rec.code)) byCode.set(rec.code, { ...rec, status: "gone", pr, prCount: d.records.length });
+  }
+  records = [...byCode.values()].sort((a, b) => String(b.issued_at).localeCompare(String(a.issued_at)));
+  const waits = new Set(records.filter(r => r.pr && r.pr.user?.login === me.login && ["wait","chg","del"].includes(r.status)).map(r => r.pr.number)).size;
+  $("waitBadge").style.display = waits ? "inline" : "none"; $("waitBadge").textContent = waits;
+  return records;
+}
+
+/* ---------- 重複チェック ---------- */
+// 同じ「受検日・組織・検定」は1枚だけ（取り下げ済みは数えない）
+const dupKey = (r) => `${r.exam_date}|${r.product}|${normOrg(r.recipient_org)}`;
+function findDuplicate(rec, statuses = ["done", "wait", "chg", "del"]) {
+  const key = normOrg(rec.recipient_org);
+  return records.find(r => statuses.includes(r.status) && (!rec.code || r.code !== rec.code) && r.exam_date === rec.exam_date &&
+    r.product === rec.product && normOrg(r.recipient_org) === key);
+}
+const STATUS_TEXT = { done: "確定", wait: "確認待ち", chg: "差し戻し", del: "削除確認待ち", gone: "取り下げ" };
+function duplicateMessage(dup, rec) {
+  return `${rec.exam_date} 受検・「${rec.recipient_org}」宛ての${productLabel(rec.product)}のクーポンはすでにあるため、発行できません。\n` +
+    `（${dup.issued_at} に ${dup.issued_by} さんが発行：${dup.code}／状態：${STATUS_TEXT[dup.status]}）\n` +
+    `受検日・組織名・検定に間違いがないか確認してください。`;
+}
+
+/* ---------- 発行 ---------- */
+function showMsg(id, kind, text) {
+  const m = $(id); m.className = "msg " + kind; m.textContent = text;
+  if (kind === "ng" || kind === "ok") m.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+const MAX_PER_PR = 50;
+let cart = store.get("coupon.cart", []);
+const saveCart = () => store.set("coupon.cart", cart);
+
+// 入力欄（受検日・配布先）の行
+function addDateRow(value = "") {
+  const d = document.createElement("div"); d.className = "row";
+  d.innerHTML = `<input type="date" class="fDate" min="${ymd(new Date())}"><button type="button" class="x" title="この受検日を消す">×</button>`;
+  d.querySelector("input").value = value;
+  d.querySelector("input").addEventListener("input", updatePreview);
+  d.querySelector(".x").onclick = () => { d.remove(); if (!document.querySelector(".fDate")) addDateRow(); updatePreview(); };
+  $("dateList").appendChild(d); return d;
+}
+function addOrgRow(name = "", category = "", users = "") {
+  const d = document.createElement("div"); d.className = "row";
+  d.innerHTML = `<input class="fOrg" placeholder="例）株式会社サンプル"><select class="fCategory">${
+    cfg.categories.map(c => `<option value="${esc(c.code)}">${esc(c.label)}（${esc(c.code)}）</option>`).join("")}</select>` +
+    `<input class="fUsers" type="number" min="1" step="1" placeholder="利用者数"><span class="unit">名</span>` +
+    `<input class="fEmail" placeholder="メール制限（任意）">` +
+    `<button type="button" class="x" title="この配布先を消す">×</button>`;
+  const inp = d.querySelector(".fOrg"), sel = d.querySelector("select");
+  inp.value = name; if (category) sel.value = category;
+  if (users) d.querySelector(".fUsers").value = users;
+  inp.addEventListener("blur", () => { inp.value = fixOrgName(inp.value); updateNoteHint(); });
+  sel.addEventListener("input", updatePreview);
+  // 複数行を貼り付けたら行ごとに分ける
+  inp.addEventListener("paste", (e) => {
+    const t = (e.clipboardData || window.clipboardData).getData("text");
+    // 「組織名」または「組織名<Tab>利用者数」の行
+    const lines = t.split(/\r?\n/).map(x => x.split("\t").map(c => c.trim())).filter(c => c[0]);
+    if (lines.length < 2 && !(lines[0] && lines[0].length > 1)) return;
+    e.preventDefault();
+    const num = (v) => { const n = String(v ?? "").normalize("NFKC").replace(/[^0-9]/g, ""); return n ? String(+n) : ""; };
+    inp.value = fixOrgName(lines[0][0]);
+    if (num(lines[0][1])) d.querySelector(".fUsers").value = num(lines[0][1]);
+    let after = d;
+    for (const l of lines.slice(1)) { const nd = addOrgRow(fixOrgName(l[0]), sel.value, num(l[1])); after.after(nd); after = nd; }
+  });
+  d.querySelector(".x").onclick = () => { d.remove(); if (!document.querySelector(".fOrg")) addOrgRow(); };
+  $("orgList").appendChild(d); return d;
+}
+function resetCategoryOptions() {   // 選択肢を読み直したとき、行の区分の選択肢も作り直す
+  document.querySelectorAll("#orgList .row").forEach(row => {
+    const sel = row.querySelector("select"), v = sel.value;
+    sel.innerHTML = cfg.categories.map(c => `<option value="${esc(c.code)}">${esc(c.label)}（${esc(c.code)}）</option>`).join("");
+    if (v) sel.value = v;
+  });
+}
+
+// 発行リストに追加
+function addToCart() {
+  const product = $("fProduct").value, discount = $("fDiscount").value, dc = discountOf(discount);
+  const requester = $("fRequester").value.trim(), note = $("fNote").value.trim();
+  const dates = [...new Set([...document.querySelectorAll(".fDate")].map(i => i.value).filter(Boolean))].sort();
+  const orgs = [...document.querySelectorAll("#orgList .row")].map(row => {
+    const inp = row.querySelector(".fOrg"); inp.value = fixOrgName(inp.value);
+    return { org: inp.value, category: row.querySelector("select").value, users: row.querySelector(".fUsers").value.trim(),
+             email: row.querySelector(".fEmail").value.trim() };
+  }).filter(o => o.org);
+  const expires = $("fExpires").value;
+  const errs = [];
+  if (!product) errs.push("検定を選んでください");
+  if (!dates.length) errs.push("受検日を1つ以上入れてください");
+  const today = ymd(new Date());
+  dates.filter(d => d < today).forEach(d => errs.push(`受検日が過去の日付（${d}）になっています。今日以降の日付を選んでください`));
+  if (!orgs.length) errs.push("配布先（組織名）を1つ以上入れてください");
+  orgs.filter(o => !/^[1-9][0-9]*$/.test(o.users)).forEach(o => errs.push(`「${o.org}」の利用者数を 1 以上の整数で入れてください`));
+  if (!["percent", "fixed_cart"].includes(dc.type) || !(dc.value > 0)) errs.push(`割引内容「${discount}」の割引区分・割引値が設定されていません（config.json を確認してください）`);
+  if (!expires) errs.push("有効期限日を入れてください");
+  else if (expires < today) errs.push(`有効期限日が過去の日付（${expires}）になっています`);
+  else if (dates.length && expires < dates[dates.length - 1]) errs.push(`有効期限日（${expires}）が受検日（${dates[dates.length - 1]}）より前になっています`);
+  const seen = new Set();
+  orgs.forEach(o => { const k = normOrg(o.org); if (seen.has(k)) errs.push(`配布先「${o.org}」が2回入っています`); seen.add(k); });
+  if (errs.length) { showMsg("msg", "ng", [...new Set(errs)].join("\n")); return; }
+
+  const inCart = new Set(cart.map(dupKey));
+  let added = 0; const skipped = [];
+  for (const date of dates) for (const o of orgs) {
+    const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), product, exam_date: date,
+      category: o.category, recipient_org: o.org, max_users: +o.users, email_restriction: o.email, expires_on: expires,
+      requester, discount, discount_type: dc.type, discount_value: dc.value,
+      note: note || `${productLabel(product)} ${o.org}` };   // メモが空欄なら「検定 配布先名」
+    if (inCart.has(dupKey(item))) { skipped.push(`${date} ${o.org}`); continue; }
+    inCart.add(dupKey(item)); cart.push(item); added++;
+  }
+  saveCart(); renderCart();
+  if (me) loadRecords().then(renderCart).catch(() => {});   // 最新の発行状況で重複を確認し直す
+  showMsg("msg", added ? "ok" : "ng",
+    (added ? `発行リストに ${added} 件追加しました（${productLabel(product)}：受検日 ${dates.length} 日 × 配布先 ${orgs.length} 件）。` : "追加できるものがありませんでした。") +
+    (skipped.length ? `\n次のものはすでにリストにあるため追加していません：${skipped.join("、")}` : "") +
+    (added ? "\n続けて別の検定を追加することもできます。終わったら下の「まとめて発行」を押してください。" : ""));
+  $("result").style.display = "none";
+}
+
+// 発行リストの表示（発行済み・確認待ちと重なるものは赤く表示）
+function cartIssues() {
+  const today = ymd(new Date());
+  return cart.map(it => {
+    if (it.exam_date < today) return `受検日が過去です`;
+    if (!it.expires_on || !it.max_users) return `有効期限日・利用者数がありません（削除して追加し直してください）`;
+    if (it.expires_on < it.exam_date) return `有効期限日が受検日より前です`;
+    if (!it.discount_type || !(it.discount_value > 0)) return `割引区分・割引値がありません（削除して追加し直してください）`;
+    const dup = me ? findDuplicate(it) : null;
+    return dup ? `発行済みあり：${dup.code}（${STATUS_TEXT[dup.status]}）` : "";
+  });
+}
+function renderCart() {
+  const issues = cartIssues();
+  $("cartTitle").textContent = `2. 発行リスト（${cart.length} 件）`;
+  $("btnIssue").textContent = cart.length ? `まとめて発行して確認を依頼する（${cart.length} 件）` : "まとめて発行して確認を依頼する";
+  $("btnIssue").disabled = !cart.length;
+  if (!cart.length) { $("cartTable").innerHTML = `<tbody><tr><td class="hint">まだありません。上で入力して「発行リストに追加」を押してください。</td></tr></tbody>`; return; }
+  $("cartTable").innerHTML = `<thead><tr><th>#</th><th>検定</th><th>受検日</th><th>有効期限日</th><th>配布先</th><th>区分</th><th>利用者数</th><th>メール制限</th><th>割引</th><th>依頼元・用途</th><th>メモ</th><th>チェック</th><th></th></tr></thead><tbody>` +
+    cart.map((it, i) => `<tr class="${issues[i] ? "dup" : ""}"><td>${i + 1}</td><td>${esc(productLabel(it.product))}</td>` +
+      `<td class="nw">${esc(it.exam_date)}</td><td class="nw">${esc(it.expires_on || "")}</td><td>${esc(it.recipient_org)}</td>` +
+      `<td>${esc(categoryLabel(it.category))}</td><td class="nw" style="text-align:right">${it.max_users ? esc(it.max_users) + "名" : ""}</td>` +
+      `<td>${esc(it.email_restriction || "")}</td>` +
+      `<td>${esc(it.discount)}</td><td>${esc(it.requester)}</td><td>${esc(it.note)}</td>` +
+      `<td>${issues[i] ? `<span class="ngtext">⚠ ${esc(issues[i])}</span>` : `<span class="oktext">OK</span>`}</td>` +
+      `<td><button class="btn sm warn" data-rm="${esc(it.id)}">削除</button></td></tr>`).join("") + "</tbody>";
+}
+
+// まとめて発行（1つの PR）
+async function issueBatch() {
+  if (!cart.length) return;
+  if (cart.length > MAX_PER_PR) { showMsg("cartMsg", "ng", `1回にまとめて発行できるのは ${MAX_PER_PR} 件までです（今は ${cart.length} 件）。リストを減らしてから発行してください。`); return; }
+  const btn = $("btnIssue"); btn.disabled = true; btn.textContent = "発行中…";
+  $("result").style.display = "none";
+  showMsg("cartMsg", "info", "発行して確認依頼を作っています。画面を閉じずにお待ちください…");
+  try {
+    await loadRecords();
+    const issues = cartIssues();
+    if (issues.some(Boolean)) {
+      renderCart();
+      showMsg("cartMsg", "ng", `赤い行（${issues.filter(Boolean).length} 件）は発行できません。その行を「削除」してから、もう一度発行してください。`);
+      return;
+    }
+    if (!confirm(`${cart.length} 件のクーポンを発行して、確認依頼（PR）を1つ作ります。よろしいですか？`)) { renderCart(); showMsg("cartMsg", "info", "発行を取りやめました。"); return; }
+    const issuedAt = nowIso(), year = issuedAt.slice(0, 4);
+    const used = new Set(records.map(r => r.code));
+    const recs = cart.map(it => {
+      let code; do { code = buildCode(it.product, it.exam_date, it.category); } while (used.has(code));
+      used.add(code);
+      return { code, product: it.product, exam_date: it.exam_date, category: it.category, issued_at: issuedAt,
+        issued_by: me.label, recipient_org: it.recipient_org, max_users: it.max_users, email_restriction: it.email_restriction || "",
+        expires_on: it.expires_on, requester: it.requester, discount: it.discount, discount_type: it.discount_type,
+        discount_value: it.discount_value, note: it.note };
+    });
+    const branch = `coupon/${issuedAt.replace(/\D/g, "")}-${randomString(4, cfg.randomChars)}`;
+    await gh.commitFiles(branch, recs.map(r => ({ path: `${settings.dir}/${year}/${r.code}.json`, text: JSON.stringify(r, null, 2) + "\n" })),
+      `クーポン発行 ${recs.length}件`);
+    let pr;
+    try {
+      pr = await gh.createPull(prTitle(recs), branch, prBodyIssue(recs));
+    } catch (e) { gh.deleteBranch(branch).catch(() => {}); throw e; }
+    cart = []; saveCart(); renderCart();
+    showMsg("cartMsg", "ok", `${recs.length} 件を発行して、確認依頼（PR #${pr.number}）を1つ作りました。`);
+    $("result").innerHTML =
+      `<div class="warnline">⚠ まだお客様に送らないでください。確認者の承認 → 一覧で「マージして確定」をしてから送付します。</div>` +
+      `<table><thead><tr><th>コード</th><th>検定</th><th>受検日</th><th>配布先</th></tr></thead><tbody>` +
+      recs.map(r => `<tr><td><code>${esc(r.code)}</code></td><td>${esc(productLabel(r.product))}</td><td class="nw">${esc(r.exam_date)}</td><td>${esc(r.recipient_org)}</td></tr>`).join("") +
+      `</tbody></table><div style="margin-top:12px"><a class="btn sub" href="${esc(pr.html_url)}" target="_blank" rel="noopener">確認依頼（PR #${pr.number}）を開く</a> ` +
+      `<button class="btn sub" id="btnCopyReq">確認者への依頼文をコピー（Slack用）</button></div>` +
+      `<div class="hint" style="margin-top:6px">貼り付けたら、先頭の「@確認者」を確認をお願いする人のメンションに書き換えてください。</div>`;
+    $("result").style.display = "block";
+    $("btnCopyReq").onclick = () => copy(requestText(recs, pr), $("btnCopyReq"));
+  } catch (e) {
+    showMsg("cartMsg", "ng", "発行できませんでした（コードは作られていません）。発行リストはそのまま残っています。\n" + e.message);
+  } finally {
+    renderCart();
+  }
+}
+// Slack で確認者に送る依頼文
+function requestText(recs, pr) {
+  const uniq = (a) => [...new Set(a)];
+  const list = (a, n) => a.length > n ? `${a.slice(0, n).join("・")} 他${a.length - n}` : a.join("・");
+  const md = (d) => { const [, m, dd] = d.split("-"); return `${+m}/${+dd}`; };
+  return `@確認者 さん\n` +
+    `クーポンコード ${recs.length}件発行しました。内容の精査と承認をお願いします。\n` +
+    `・発行コード数：${recs.length}件\n` +
+    `・発行クーポン：${uniq(recs.map(r => productLabel(r.product))).join("・")}\n` +
+    `・受検日：${uniq(recs.map(r => r.exam_date)).sort().map(md).join("・")}\n` +
+    `・対象：${list(uniq(recs.map(r => r.recipient_org)), 2)}\n` +
+    `・確認依頼（PR）：${pr.html_url}`;
+}
+function prTitle(recs) {
+  const uniq = (a) => [...new Set(a)];
+  const prods = uniq(recs.map(r => productLabel(r.product)));
+  const dates = uniq(recs.map(r => r.exam_date)).sort();
+  const orgs = uniq(recs.map(r => r.recipient_org));
+  const list = (a, n) => a.length > n ? `${a.slice(0, n).join("・")} 他${a.length - n}` : a.join("・");
+  return `【発行】${recs.length}件 ${list(prods, 2)} ${list(dates.map(d => d.slice(5).replace("-", "/")), 3)} ${list(orgs, 2)}`;
+}
+async function copy(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+  const old = btn.textContent; btn.textContent = "コピーしました ✓"; setTimeout(() => btn.textContent = old, 1500);
+}
+
+/* ---------- 一覧の操作 ---------- */
+async function mergePr(code) {
+  const r = records.find(x => x.code === code); if (!r?.pr) return;
+  await loadRecords();
+  const cur = records.find(x => x.code === code);
+  if (!cur?.pr || cur.pr.number !== r.pr.number) { showMsg("lMsg", "ng", "状態が変わっていました。一覧を最新にしました。"); renderLedger(); return; }
+  if (cur.pr.user.login !== me.login) { showMsg("lMsg", "ng", "マージできるのは発行した本人だけです。"); return; }
+  if (!cur.rs.approved) { showMsg("lMsg", "ng", "まだ確認者の承認（Approve）がありません。"); renderLedger(); return; }
+  const group = records.filter(x => x.pr && x.pr.number === cur.pr.number);
+  if (cur.status === "wait") {
+    for (const g of group) {   // 先に別の依頼が確定していたら止める
+      const dup = findDuplicate(g, ["done", "del"]);
+      if (dup) { showMsg("lMsg", "ng", duplicateMessage(dup, g) + "\nこの確認依頼は「取り下げ」てください。"); return; }
+    }
+  }
+  const isDel = cur.status === "del";
+  const n = group.length;
+  if (!confirm(isDel ? `クーポン ${code} の削除を確定しますか？`
+                     : `PR #${cur.pr.number} の ${n} 件をまとめて確定しますか？\n確定後、お客様に送付できます。`)) return;
+  try {
+    const batchCodes = new Set(group.map(g => g.code));
+    await gh.merge(cur.pr.number, isDel ? `クーポン削除: ${code}（${cur.recipient_org}） #${cur.pr.number}` : `${cur.pr.title} #${cur.pr.number}`);
+    await gh.deleteBranch(cur.pr.head.ref);
+    await loadRecords(); renderLedger();
+    showMsg("lMsg", "ok", isDel ? `「${code}」を削除しました。` : `${n} 件を確定しました。お客様に送付できます。`);
+    if (!isDel) {
+      const b = document.createElement("button"); b.className = "btn sm go"; b.style.marginLeft = "12px";
+      b.textContent = `この ${n} 件の取り込み用CSVをダウンロード`;
+      b.onclick = () => downloadImportCsv(records.filter(x => batchCodes.has(x.code)), `pr${cur.pr.number}`);
+      $("lMsg").appendChild(b);
+    }
+  } catch (e) {
+    showMsg("lMsg", "ng", "マージできませんでした。\n" + e.message +
+      (e.status === 405 ? "\n（GitHub 側の条件を満たしていない可能性があります。PR の画面を確認してください）" : ""));
+  }
+}
+async function withdrawPr(code) {
+  const r = records.find(x => x.code === code); if (!r?.pr) return;
+  const isDel = r.status === "del";
+  const group = records.filter(x => x.pr && x.pr.number === r.pr.number);
+  if (!confirm(isDel ? `「${code}」の削除申請を取り下げますか？（クーポンは確定のまま残ります）`
+                     : `PR #${r.pr.number} の確認依頼（${group.length} 件）をまとめて取り下げますか？\nこれらのコードは使えなくなり、同じ内容で発行し直せるようになります。`)) return;
+  try {
+    await gh.closePull(r.pr.number); await gh.deleteBranch(r.pr.head.ref);
+    let back = false;
+    if (!isDel && confirm(`取り下げた ${group.length} 件を「発行リスト」に戻しますか？\n間違っている行だけ直して（削除して）、もう一度まとめて発行できます。`)) {
+      for (const g of group) cart.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), product: g.product,
+        exam_date: g.exam_date, category: g.category, recipient_org: g.recipient_org, max_users: g.max_users, expires_on: g.expires_on,
+        email_restriction: g.email_restriction || "", requester: g.requester, discount: g.discount,
+        discount_type: g.discount_type, discount_value: g.discount_value, note: g.note });
+      saveCart(); back = true;
+    }
+    await loadRecords(); renderLedger(); renderCart();
+    showMsg("lMsg", "ok", isDel ? "削除申請を取り下げました。" :
+      back ? `取り下げて、${group.length} 件を発行リストに戻しました。「① クーポンを発行する」タブで直して発行し直してください。` : "確認依頼を取り下げました。必要なら発行し直してください。");
+  } catch (e) { showMsg("lMsg", "ng", "取り下げできませんでした。\n" + e.message); }
+}
+async function requestDelete(code) {
+  const r = records.find(x => x.code === code); if (!r || r.status !== "done") return;
+  const reason = prompt(`クーポン ${code}（${r.recipient_org} / 受検日 ${r.exam_date}）の削除を申請します。\n削除の理由を入れてください（例：組織名の誤り）`);
+  if (reason === null) return;
+  if (!reason.trim()) { alert("削除の理由を入れてください。"); return; }
+  let branch = `delete/${code}-${Date.now().toString(36)}`;
+  try {
+    await gh.createBranch(branch, await gh.headSha(settings.branch));
+    await gh.deleteFile(r._path, r._sha, branch, `クーポン削除: ${code}（${r.recipient_org}）`);
+    const rec = Object.fromEntries(COLUMNS.map(c => [c, r[c]]));
+    rec.deleted_by = me.label;
+    const pr = await gh.createPull(`【削除】${productLabel(r.product)} ${r.exam_date} ${r.recipient_org}`, branch, prBodyDelete(rec, reason.trim()));
+    branch = null;
+    await loadRecords(); renderLedger();
+    showMsg("lMsg", "ok", `削除の確認依頼（PR #${pr.number}）を作りました。承認されたら「マージして確定」で削除されます。`);
+  } catch (e) {
+    if (branch) gh.deleteBranch(branch).catch(() => {});
+    showMsg("lMsg", "ng", "削除申請できませんでした。\n" + e.message);
+  }
+}
+
+/* ---------- 一覧の表示 ---------- */
+const FILTERS = { active: s => s !== "gone", wait: s => s === "wait" || s === "chg", done: s => s === "done", del: s => s === "del", gone: s => s === "gone", all: () => true };
+function statusCell(r) {
+  const cls = { done: "done", wait: "wait", chg: "chg", del: "del", gone: "gone" }[r.status];
+  let sub = "";
+  if (r.rs && (r.status === "wait" || r.status === "del")) sub = r.rs.approved ? `承認：${r.rs.approvers.join("、")}` : "確認者の承認待ち";
+  if (r.status === "chg") sub = `修正依頼：${r.rs.changers.join("、")}（PR のコメントを確認）`;
+  if (r.status === "del" && r.reason) sub += `<br>理由：${esc(r.reason)}`;
+  return `<span class="st ${cls}">${STATUS_TEXT[r.status]}</span>${sub ? `<div class="sub">${sub}</div>` : ""}`;
+}
+function actionCell(r) {
+  const a = [];
+  const mine = r.pr && r.pr.user?.login === me.login;
+  const many = r.prCount > 1 && r.status !== "del" ? `（${r.prCount}件）` : "";
+  if (r.pr) a.push(`<a class="btn sm plain" href="${esc(r.pr.html_url)}" target="_blank" rel="noopener">PR #${r.pr.number}${many}</a>`);
+  if ((r.status === "wait" || r.status === "del") && mine && r.rs.approved) a.push(`<button class="btn sm go" data-act="merge" data-code="${esc(r.code)}">マージして確定${many}</button>`);
+  if (r.status === "wait" && mine && !r.rs.approved) a.push(`<button class="btn sm sub" data-req="${r.pr.number}">依頼文をコピー</button>`);
+  if (["wait","chg","del"].includes(r.status) && mine) a.push(`<button class="btn sm warn" data-act="withdraw" data-code="${esc(r.code)}">取り下げ${many}</button>`);
+  if (r.status === "done") a.push(`<button class="btn sm sub" data-copy="${esc(r.code)}">コードをコピー</button>`,
+                               `<button class="btn sm warn" data-act="delete" data-code="${esc(r.code)}">削除申請</button>`);
+  return a.join("<br>");
+}
+function renderLedger() {
+  const q = $("lSearch").value.trim();
+  const rows = visibleRecords();
+  $("lTable").innerHTML = `<thead><tr><th>状態</th><th>コード</th><th>配布先</th><th>利用者数</th><th>検定</th><th>受検日</th><th>有効期限日</th><th>依頼元・用途</th><th>割引</th><th>発行者・発行日時</th><th>メモ</th><th>操作</th></tr></thead><tbody>` +
+    rows.map(r => `<tr class="${r.status === "gone" ? "muted" : ""}">` +
+      `<td>${statusCell(r)}</td><td><code>${esc(r.code)}</code></td><td>${esc(r.recipient_org)}${r.email_restriction ? `<div class="sub">メール制限：${esc(r.email_restriction)}</div>` : ""}</td>` +
+      `<td class="nw" style="text-align:right">${r.max_users ? esc(r.max_users) + "名" : ""}</td>` +
+      `<td>${esc(productLabel(r.product))}</td><td class="nw">${esc(r.exam_date)}</td><td class="nw">${esc(r.expires_on || "")}</td><td>${esc(r.requester)}</td>` +
+      `<td>${esc(r.discount)}</td><td>${esc(r.issued_by)}<div class="sub">${esc(r.issued_at)}</div></td><td>${esc(r.note)}</td>` +
+      `<td>${actionCell(r)}</td></tr>`).join("") + "</tbody>";
+  $("lCount").textContent = `${rows.length} 件表示（全 ${records.length} 件）　新しい順`;
+}
+async function reloadLedger() {
+  $("lCount").textContent = "読み込み中…";
+  try { await loadRecords(); renderLedger(); }
+  catch (e) { $("lCount").textContent = ""; showMsg("lMsg", "ng", "一覧を読み込めませんでした。\n" + e.message); }
+}
+/* ---------- 取り込み用 CSV（別システム向け） ----------
+ * 列：クーポンコード, 割引区分, 割引値, 利用制限数, 有効期限(YYYYMMDD), メモ(検定名 受検日 会社名), メールアドレス制限
+ * 文字コード UTF-8（BOM なし）、見出し行なし */
+const IMPORT_HEADER = false;
+// メモに入れる検定名（config.json の products に memoName があればそれを使う）
+const memoName = (code) => { const p = cfg.products.find(x => x.code === code); return (p && (p.memoName || p.label)) || code; };
+function importRow(r) {
+  const dc = r.discount_type ? { type: r.discount_type, value: r.discount_value } : discountOf(r.discount);
+  return [r.code, dc.type, dc.value, r.max_users, String(r.expires_on || "").replace(/-/g, ""),
+    `${memoName(r.product)} ${String(r.exam_date).replace(/-/g, "/")} ${r.recipient_org}`, r.email_restriction || ""];
+}
+function importProblems(r) {
+  const [, type, value, users, exp] = importRow(r), p = [];
+  if (!["percent", "fixed_cart"].includes(type)) p.push("割引区分");
+  if (!(Number(value) > 0)) p.push("割引値");
+  if (!(Number(users) > 0)) p.push("利用制限数");
+  if (!/^\d{8}$/.test(exp)) p.push("有効期限");
+  return p;
+}
+function downloadImportCsv(recs, label) {
+  recs = recs.filter(r => r.status === "done");
+  if (!recs.length) { showMsg("lMsg", "ng", "出力できる「確定」のクーポンがありません。\n（取り込み用CSVは「確定」になったものだけが対象です。確認待ちのものは、承認されて「マージして確定」してから出力してください）"); return; }
+  const bad = recs.map(r => [r, importProblems(r)]).filter(([, p]) => p.length);
+  if (bad.length) {
+    showMsg("lMsg", "ng", `次のクーポンは取り込みに必要な項目が足りないため、出力できません。\n` +
+      bad.slice(0, 10).map(([r, p]) => `・${r.code}（${p.join("・")}がありません）`).join("\n") + (bad.length > 10 ? `\n…ほか ${bad.length - 10} 件` : "") +
+      `\n削除申請して、発行し直してください。`);
+    return;
+  }
+  const q = (v) => { v = String(v ?? ""); return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  const lines = recs.map(r => importRow(r).map(q).join(","));
+  if (IMPORT_HEADER) lines.unshift("クーポンコード,割引区分,割引値,利用制限数,有効期限,メモ,メールアドレス制限");
+  saveFile(lines.join("\n") + "\n", `coupon-import-${label || ymd(new Date()).replace(/-/g, "")}.csv`, "text/csv;charset=utf-8");
+  showMsg("lMsg", "ok", `取り込み用 CSV（${recs.length} 件）をダウンロードしました。`);
+}
+// ファイルを保存する（リンクをページに置いてからクリックし、少し待ってから後片付けする）
+function saveFile(text, name, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name; a.style.display = "none";
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 3000);
+}
+function visibleRecords() {
+  const q = $("lSearch").value.trim().toLowerCase();
+  const fil = FILTERS[$("lStatus").value];
+  return records.filter(r => fil(r.status) && (!q || COLUMNS.some(c => String(r[c] ?? "").toLowerCase().includes(q))));
+}
+function downloadCsv() {
+  const cols = ["status", ...COLUMNS];
+  const q = (v) => { v = String(v ?? ""); return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  const text = "﻿" + [cols.join(","), ...records.map(r => cols.map(c => q(c === "status" ? STATUS_TEXT[r.status] : r[c])).join(","))].join("\r\n") + "\r\n";
+  saveFile(text, `coupons-${ymd(new Date())}.csv`, "text/csv;charset=utf-8");
+  showMsg("lMsg", "ok", `台帳CSV（${records.length} 件）をダウンロードしました。`);
+}
+
+/* ---------- 選択肢 ---------- */
+async function loadConfig() {
+  cfg = DEFAULT_CONFIG;
+  if (settings.config && gh && me) {
+    try { const f = await gh.readFile(settings.config, settings.branch); if (f) cfg = { ...DEFAULT_CONFIG, ...JSON.parse(f.text) }; }
+    catch (e) { showMsg("msg", "ng", "選択肢の設定ファイルを読めませんでした。初期値で表示します。\n" + e.message); }
+  }
+  const opt = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`;
+  $("fProduct").innerHTML  = cfg.products.map(p => opt(p.code, `${p.label}（${p.code}）`)).join("");
+  resetCategoryOptions();
+  cfg.discounts = cfg.discounts.map(normalizeDiscount);
+  const bad = cfg.discounts.filter(d => !["percent", "fixed_cart"].includes(d.type) || !(d.value > 0));
+  if (bad.length) showMsg("msg", "ng", "config.json の割引の設定に、割引区分（percent / fixed_cart）か割引値が正しくないものがあります：" + bad.map(d => d.label).join("、"));
+  $("fDiscount").innerHTML = cfg.discounts.map(d => opt(d.label, d.label)).join("");
+  $("requesterList").innerHTML = (cfg.requesters || []).map(r => `<option value="${esc(r)}">`).join("");
+  updatePreview();
+}
+function updateNoteHint() {
+  const org = [...document.querySelectorAll(".fOrg")].map(i => i.value.trim()).find(Boolean) || "株式会社サンプル";
+  const ex = `${productLabel($("fProduct").value)} ${fixOrgName(org)}`;
+  $("fNote").placeholder = `空欄なら自動：${ex}`;
+  $("noteHint").textContent = `空欄のままなら、配布先ごとに「検定 配布先名」（例：${ex}）が入ります。入力した場合は、入力した内容がすべての配布先に入ります`;
+}
+function updatePreview() {
+  updateNoteHint();
+  const p = $("fProduct").value, c = document.querySelector(".fCategory")?.value, d = document.querySelector(".fDate")?.value;
+  $("preview").textContent = p && c ? `${p}${d ? datePart(d) : "YYMMDD"}-${c}-${"x".repeat(cfg.randomLength)}` : "";
+}
+
+/* ---------- 設定・接続 ---------- */
+const SETTING_FIELDS = { sApi:"api", sOwner:"owner", sRepo:"repo", sBranch:"branch", sDir:"dir", sConfig:"config", sToken:"token" };
+const SETTING_NAMES = { sApi:"API の URL", sOwner:"オーナー", sRepo:"リポジトリ名", sBranch:"ブランチ", sDir:"クーポンを置くフォルダ", sToken:"個人アクセストークン" };
+function fillSettings() { for (const [id, k] of Object.entries(SETTING_FIELDS)) $(id).value = settings[k] ?? ""; }
+async function connect() {
+  me = null;
+  if (!(settings.api && settings.owner && settings.repo && settings.branch && settings.dir && settings.token))
+    throw new Error("設定が足りません。設定タブで入力してください。");
+  gh = new GitHub(settings);
+  let u;
+  try { u = await gh.user(); } catch (e) { throw new Error(`ログイン確認に失敗しました（${e.status || "?"}）。トークンを確認してください。`); }
+  let repo;
+  try { repo = await gh.repoInfo(); }
+  catch (e) { throw new Error(`リポジトリ「${settings.owner}/${settings.repo}」が見つかりません（${e.status || "?"}）。オーナー名・リポジトリ名と、トークンの権限を確認してください。`); }
+  if (repo.permissions && !repo.permissions.push) throw new Error("このリポジトリへの書き込み権限がありません。管理者に招待してもらってください。");
+  try { await gh.call("GET", `${gh.repo}/pulls?state=open&per_page=1`); }
+  catch (e) {
+    if (e.status === 403) throw new Error("トークンに「Pull requests」の権限がありません。\nGitHub の Settings → Developer settings → トークンの Edit で、Repository permissions の「Pull requests」を「Read and write」にしてください（classic token なら「repo」にチェック）。");
+    throw e;
+  }
+  me = { login: u.login, label: u.name ? `${u.name} (${u.login})` : u.login };
+  $("who").textContent = `発行者: ${me.label}`;
+  await loadConfig();
+}
+async function saveSettings() {
+  for (const [id, k] of Object.entries(SETTING_FIELDS)) settings[k] = $(id).value.trim();
+  document.querySelectorAll("#tab-settings input").forEach(i => i.classList.remove("missing"));
+  const sMsg = (kind, t) => { $("sMsg").className = kind; $("sMsg").textContent = t; };
+  const missing = Object.keys(SETTING_NAMES).filter(id => !$(id).value.trim());
+  if (missing.length) {
+    missing.forEach(id => $(id).classList.add("missing")); $(missing[0]).focus();
+    sMsg("ng", "⚠ 次の項目が空欄です（赤枠の欄）：" + missing.map(id => SETTING_NAMES[id]).join("、") + "\n薄い文字は入力例なので、実際に入力してください。");
+    return;
+  }
+  store.set("coupon.settings", settings);
+  sMsg("", "接続テスト中…");
+  try { await connect(); sMsg("ok", `✓ 保存しました。「${me.label}」として ${settings.owner}/${settings.repo} に接続できました。`); }
+  catch (e) { $("who").textContent = "未接続"; sMsg("ng", "⚠ 接続できませんでした。\n" + e.message); }
+}
+
+/* ---------- 起動 ---------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("active", s.id === "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "ledger" && me) reloadLedger();
+  if (b.dataset.tab === "issue" && me) loadRecords().then(renderCart).catch(() => {});
+  if (b.dataset.tab === "settings") fillSettings();
+});
+$("fProduct").addEventListener("input", updatePreview);
+$("btnAddDate").onclick = () => addDateRow().querySelector("input").focus();
+$("btnAddOrg").onclick = () => addOrgRow("", [...document.querySelectorAll(".fCategory")].pop()?.value).querySelector("input").focus();
+$("btnAdd").onclick = addToCart;
+$("btnIssue").onclick = () => { if (!me) { showMsg("cartMsg", "ng", "GitHub に接続できていません。設定タブを確認してください。"); return; } issueBatch(); };
+$("btnClearCart").onclick = () => { if (cart.length && confirm(`発行リストの ${cart.length} 件をすべて消しますか？`)) { cart = []; saveCart(); renderCart(); } };
+$("cartTable").addEventListener("click", e => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  cart = cart.filter(it => it.id !== b.dataset.rm); saveCart(); renderCart();
+});
+$("lTable").addEventListener("click", e => {
+  const c = e.target.closest("[data-copy]"); if (c) { copy(c.dataset.copy, c); return; }
+  const q = e.target.closest("[data-req]");
+  if (q) { const g = records.filter(x => x.pr && x.pr.number === +q.dataset.req && x.status !== "del"); copy(requestText(g, g[0].pr), q); return; }
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const fn = { merge: mergePr, withdraw: withdrawPr, delete: requestDelete }[b.dataset.act];
+  b.disabled = true; $("lMsg").className = "msg";
+  fn(b.dataset.code).finally(() => { b.disabled = false; });
+});
+$("lSearch").addEventListener("input", renderLedger);
+$("lStatus").addEventListener("change", renderLedger);
+$("btnReload").onclick = reloadLedger;
+$("btnCsv").onclick = downloadCsv;
+$("btnImportCsv").onclick = () => downloadImportCsv(visibleRecords());
+$("btnSave").onclick = saveSettings;
+
+(async function boot() {
+  cfg = DEFAULT_CONFIG;
+  $("fExpires").min = ymd(new Date());
+  addDateRow(); addOrgRow(); renderCart();
+  try {
+    await connect();
+    loadRecords().then(renderCart).catch(() => {});    // 確認待ち件数と、発行リストの重複チェック
+  } catch (e) {
+    await loadConfig().catch(() => {});
+    showMsg("msg", "ng", "GitHub に接続できません。設定タブを確認してください。\n" + e.message);
+  }
+})();
+</script>
+</body>
+</html>

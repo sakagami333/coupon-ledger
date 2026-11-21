@@ -1,0 +1,62 @@
+{
+  "products": [
+    {
+      "code": "scb",
+      "label": "クラウド検定ベーシック"
+    },
+    {
+      "code": "sca",
+      "label": "クラウド検定アドバンス"
+    },
+    {
+      "code": "sai",
+      "label": "さくらのAI検定"
+    }
+  ],
+  "categories": [
+    {
+      "code": "biz",
+      "label": "企業"
+    },
+    {
+      "code": "ptn",
+      "label": "パートナー企業"
+    },
+    {
+      "code": "grp",
+      "label": "グループ企業"
+    },
+    {
+      "code": "usr",
+      "label": "個人"
+    },
+    {
+      "code": "edu",
+      "label": "教育機関"
+    }
+  ],
+  "discounts": [
+    {
+      "label": "受験料 100%割引",
+      "type": "percent",
+      "value": 100
+    },
+    {
+      "label": "受験料 50%割引",
+      "type": "percent",
+      "value": 50
+    },
+    {
+      "label": "受験料 3,000円引き",
+      "type": "fixed_cart",
+      "value": 3000
+    }
+  ],
+  "randomLength": 8,
+  "randomChars": "abcdefghjkmnpqrstuvwxyz23456789",
+  "requesters": [
+    "テスト",
+    "自部門",
+    "営業部"
+  ]
+}
