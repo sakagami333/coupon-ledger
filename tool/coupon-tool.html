@@ -92,6 +92,9 @@
   .flow { padding:6px 10px; font-size:12.5px; margin-bottom:10px; }
   .grid { grid-template-columns:170px 1fr; gap:6px 12px; }
   .grid label { font-size:13.5px; }
+  /* 左の項目名は上ぞろえ（入力欄が複数行になっても、1行目の高さにそろえる） */
+  .grid { align-items:start; }
+  .grid > label { padding-top:5px; line-height:1.4; }
   input, select, textarea { font-size:14px; padding:4px 8px; border-radius:4px; }
   .row { margin-bottom:4px; gap:6px; }
   .row input[type=date], .row select { width:180px; }
@@ -508,7 +511,7 @@ function addOrgRow(name = "", category = "", users = "") {
   const d = document.createElement("div"); d.className = "row";
   d.innerHTML = `<input class="fOrg" placeholder="例）株式会社サンプル"><select class="fCategory">${
     cfg.categories.map(c => `<option value="${esc(c.code)}">${esc(c.label)}（${esc(c.code)}）</option>`).join("")}</select>` +
-    `<input class="fUsers" type="number" min="1" step="1" placeholder="利用者数"><span class="unit">名</span>` +
+    `<input class="fUsers" type="number" min="1" step="1" placeholder="人数"><span class="unit">名</span>` +
     `<input class="fEmail" placeholder="メール制限（任意）">` +
     `<button type="button" class="x" title="この配布先を消す">×</button>`;
   const inp = d.querySelector(".fOrg"), sel = d.querySelector("select");
