@@ -1,0 +1,18 @@
+{
+  "code": "scb261122-biz-5nem2b7t",
+  "code_source": "generated",
+  "product": "scb",
+  "exam_date": "2026-11-22",
+  "category": "biz",
+  "issued_at": "2026-11-21 20:00:33",
+  "issued_by": "Kimi Sakagami (sakagami333)",
+  "recipient_org": "test",
+  "max_users": 110,
+  "email_restriction": "",
+  "expires_on": "2026-11-30",
+  "requester": "",
+  "discount": "受験料 100%割引",
+  "discount_type": "percent",
+  "discount_value": 100,
+  "note": "クラウド検定ベーシック test"
+}
