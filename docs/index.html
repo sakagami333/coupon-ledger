@@ -10,7 +10,10 @@
   body { margin:0; font-family: "Yu Gothic UI","Meiryo",sans-serif; background:var(--bg); color:#222; font-size:16px; }
   header { background:var(--main); color:#fff; padding:14px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
   header h1 { font-size:20px; margin:0; }
-  #who { margin-left:auto; font-size:14px; opacity:.9; }
+  #who { margin-left:auto; font-size:14px; display:flex; align-items:center; gap:8px; }
+  #who:empty { display:none; }
+  #who .avatar { width:24px; height:24px; border-radius:50%; background:#fff; }
+  #who .login { opacity:.75; font-size:12px; }
   nav { display:flex; gap:4px; padding:0 24px; background:#fff; border-bottom:1px solid var(--line); }
   nav button { border:none; background:none; padding:14px 20px; font-size:16px; cursor:pointer; border-bottom:3px solid transparent; }
   nav button.active { border-bottom-color:var(--main); color:var(--main); font-weight:bold; }
@@ -108,12 +111,14 @@
   .actions { margin-top:12px; }
   .msg { margin-top:10px; padding:8px 12px; }
   th, td { padding:5px 6px; font-size:13px; }
+  /* 日付の入力欄はすべて同じ幅にそろえる */
+  input[type=date] { width:180px !important; flex:none; }
 </style>
 </head>
 <body>
 <header>
   <h1>🎫 検定クーポン発行ツール</h1>
-  <span id="who">未接続</span>
+  <span id="who"></span>
 </header>
 <nav>
   <button data-tab="issue" class="active">① クーポンを発行する</button>
@@ -146,7 +151,7 @@
     <select id="fDiscount"></select>
 
     <label for="fExpires" class="req">有効期限日</label>
-    <div><input type="date" id="fExpires" style="width:220px"><div class="hint">この画面で追加するクーポンすべてに付きます。クーポンは申込期間中に使うため、受検日より前の日付にしてください（受検日が複数あるときは、いちばん早い受検日より前）</div></div>
+    <div><input type="date" id="fExpires" class="dateBox"><div class="hint">この画面で追加するクーポンすべてに付きます。クーポンは申込期間中に使うため、受検日より前の日付にしてください（受検日が複数あるときは、いちばん早い受検日より前）</div></div>
 
     <label for="fRequester">依頼元・用途</label>
     <div><input id="fRequester" list="requesterList" placeholder="例）営業部"><datalist id="requesterList"></datalist>
@@ -917,6 +922,12 @@ function updatePreview() {
 const SETTING_FIELDS = { sApi:"api", sOwner:"owner", sRepo:"repo", sBranch:"branch", sDir:"dir", sConfig:"config", sToken:"token" };
 const SETTING_NAMES = { sApi:"API の URL", sOwner:"オーナー", sRepo:"リポジトリ名", sBranch:"ブランチ", sDir:"クーポンを置くフォルダ", sToken:"個人アクセストークン" };
 function fillSettings() { for (const [id, k] of Object.entries(SETTING_FIELDS)) $(id).value = settings[k] ?? ""; }
+// 右上にログイン中のユーザーを表示（アイコン・名前・ユーザー名）
+function showWho(u) {
+  const img = u.avatar_url ? `<img src="${esc(u.avatar_url)}" alt="" class="avatar">` : "";
+  $("who").innerHTML = `${img}<span>${esc(u.name || u.login)}</span><span class="login">@${esc(u.login)}</span>`;
+  $("who").title = "GitHub にこのユーザーで接続しています";
+}
 async function connect() {
   me = null;
   if (!(settings.api && settings.owner && settings.repo && settings.branch && settings.dir && settings.token))
@@ -934,7 +945,7 @@ async function connect() {
     throw e;
   }
   me = { login: u.login, label: u.name ? `${u.name} (${u.login})` : u.login };
-  $("who").textContent = `発行者: ${me.label}`;
+  showWho(u);
   await loadConfig();
 }
 async function saveSettings() {
@@ -950,7 +961,7 @@ async function saveSettings() {
   store.set("coupon.settings", settings);
   sMsg("", "接続テスト中…");
   try { await connect(); sMsg("ok", `✓ 保存しました。「${me.label}」として ${settings.owner}/${settings.repo} に接続できました。`); }
-  catch (e) { $("who").textContent = "未接続"; sMsg("ng", "⚠ 接続できませんでした。\n" + e.message); }
+  catch (e) { $("who").innerHTML = ""; sMsg("ng", "⚠ 接続できませんでした。\n" + e.message); }
 }
 
 /* ---------- 起動 ---------- */
