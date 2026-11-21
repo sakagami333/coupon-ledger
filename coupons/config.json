@@ -42,9 +42,9 @@
       "value": 100
     },
     {
-      "label": "受験料 50%割引",
+      "label": "受験料 20%割引",
       "type": "percent",
-      "value": 50
+      "value": 20
     },
     {
       "label": "受験料 3,000円引き",
