@@ -194,7 +194,7 @@
     <input type="search" id="lSearch" placeholder="コード・組織名・依頼元などで検索">
     <button class="btn sub" id="btnReload">最新にする</button>
     <button class="btn sub" id="btnCsv">台帳CSV（Excel用）</button>
-    <button class="btn" id="btnImportCsv" style="padding:8px 16px;font-size:15px">取り込み用CSV（表示中の確定分）</button>
+    <button class="btn" id="btnImportCsv">取り込み用CSV（表示中の確定分）</button>
   </div>
   <div class="hint" id="lCount"></div>
   <div id="lMsg" class="msg"></div>
@@ -565,6 +565,7 @@ function addToCart() {
   const today = ymd(new Date());
   dates.filter(d => d < today).forEach(d => errs.push(`受検日が過去の日付（${d}）になっています。今日以降の日付を選んでください`));
   if (!orgs.length) errs.push("配布先（組織名）を1つ以上入れてください");
+  orgs.filter(o => !cfg.categories.some(c => c.code === o.category)).forEach(o => errs.push(`「${o.org}」の区分を選んでください`));
   orgs.filter(o => !/^[1-9][0-9]*$/.test(o.users)).forEach(o => errs.push(`「${o.org}」の利用者数を 1 以上の整数で入れてください`));
   if (!["percent", "fixed_cart"].includes(dc.type) || !(dc.value > 0)) errs.push(`割引内容「${discount}」の割引区分・割引値が設定されていません（config.json を確認してください）`);
   if (!expires) errs.push("有効期限日を入れてください");
@@ -610,6 +611,7 @@ function cartIssues() {
       if (ex) return `指定コードは発行済みです（${ex.recipient_org}／${STATUS_TEXT[ex.status]}）`;
     }
     if (it.exam_date < today) return `受検日が過去です`;
+    if (!cfg.categories.some(c => c.code === it.category)) return `区分が選ばれていません`;
     if (!it.expires_on || !it.max_users) return `有効期限日・利用者数がありません（削除して追加し直してください）`;
     if (it.expires_on >= it.exam_date) return `有効期限日が受検日と同じか後です（受検日より前にしてください）`;
     if (!it.discount_type || !(it.discount_value > 0)) return `割引区分・割引値がありません（削除して追加し直してください）`;
