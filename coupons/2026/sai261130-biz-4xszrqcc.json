@@ -1,0 +1,18 @@
+{
+  "code": "sai261130-biz-4xszrqcc",
+  "code_source": "generated",
+  "product": "sai",
+  "exam_date": "2026-11-30",
+  "category": "biz",
+  "issued_at": "2026-11-21 20:00:33",
+  "issued_by": "Kimi Sakagami (sakagami333)",
+  "recipient_org": "さくらインターネット株式会社",
+  "max_users": 200,
+  "email_restriction": "",
+  "expires_on": "2026-11-30",
+  "requester": "",
+  "discount": "受験料 100%割引",
+  "discount_type": "percent",
+  "discount_value": 100,
+  "note": "さくらのAI検定 さくらインターネット株式会社"
+}
