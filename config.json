@@ -1,0 +1,18 @@
+{
+  "products": [
+    { "code": "scb", "label": "SCB検定" }
+  ],
+  "categories": [
+    { "code": "biz", "label": "法人" },
+    { "code": "edu", "label": "教育機関" },
+    { "code": "ind", "label": "個人" }
+  ],
+  "discounts": [
+    "受験料 100%割引",
+    "受験料 50%割引",
+    "受験料 3,000円引き"
+  ],
+  "randomLength": 8,
+  "randomChars": "abcdefghjkmnpqrstuvwxyz23456789",
+  "defaultExpireDays": 90
+}

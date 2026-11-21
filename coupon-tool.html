@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>検定クーポン発行ツール</title>
+<style>
+  :root { --main:#1f5fbf; --bg:#f4f6fa; --line:#d5dbe5; --ok:#1d7a3e; --ng:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Yu Gothic UI","Meiryo",sans-serif; background:var(--bg); color:#222; font-size:16px; }
+  header { background:var(--main); color:#fff; padding:14px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:20px; margin:0; }
+  #who { margin-left:auto; font-size:14px; opacity:.9; }
+  nav { display:flex; gap:4px; padding:0 24px; background:#fff; border-bottom:1px solid var(--line); }
+  nav button { border:none; background:none; padding:14px 20px; font-size:16px; cursor:pointer; border-bottom:3px solid transparent; }
+  nav button.active { border-bottom-color:var(--main); color:var(--main); font-weight:bold; }
+  main { max-width:960px; margin:24px auto; padding:0 16px; }
+  section { display:none; background:#fff; border:1px solid var(--line); border-radius:8px; padding:24px; }
+  section.active { display:block; }
+  .grid { display:grid; grid-template-columns: 200px 1fr; gap:14px 16px; align-items:center; }
+  .grid label { font-weight:bold; }
+  .req::after { content:" ＊必須"; color:var(--ng); font-size:12px; font-weight:normal; }
+  input, select, textarea { font-size:16px; padding:8px 10px; border:1px solid #aab3c2; border-radius:6px; width:100%; font-family:inherit; }
+  input[type=number] { width:120px; }
+  .hint { font-size:13px; color:#666; }
+  .preview { font-family: Consolas, monospace; font-size:20px; background:#eef3fb; padding:10px 14px; border-radius:6px; letter-spacing:.5px; }
+  .btn { background:var(--main); color:#fff; border:none; border-radius:8px; padding:14px 32px; font-size:18px; cursor:pointer; }
+  .btn:disabled { background:#9aa7bb; cursor:wait; }
+  .btn.sub { background:#fff; color:var(--main); border:1px solid var(--main); padding:8px 16px; font-size:15px; }
+  .actions { margin-top:24px; text-align:center; }
+  #msg { margin:16px 0 0; padding:12px 16px; border-radius:6px; display:none; white-space:pre-wrap; }
+  #msg.ok { display:block; background:#e6f4ea; color:var(--ok); }
+  #msg.ng { display:block; background:#fce8e6; color:var(--ng); }
+  #msg.info { display:block; background:#eef3fb; color:#234; }
+  .result { margin-top:20px; }
+  .result ul { list-style:none; padding:0; }
+  .result li { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px dashed var(--line); }
+  .result code { font-size:20px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { border-bottom:1px solid var(--line); padding:8px 6px; text-align:left; vertical-align:top; }
+  th { background:#f0f3f8; position:sticky; top:0; }
+  td code { font-size:14px; }
+  .toolbar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+  .toolbar input[type=search] { flex:1; min-width:200px; }
+  .tablewrap { max-height:60vh; overflow:auto; }
+  .mode-demo { background:#fff4ce; color:#7a5b00; padding:8px 24px; font-size:14px; }
+  h2 { font-size:18px; margin-top:0; }
+  h3 { font-size:16px; margin:24px 0 8px; border-left:4px solid var(--main); padding-left:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎫 検定クーポン発行ツール</h1>
+  <span id="who"></span>
+</header>
+<div id="demoBanner" class="mode-demo" style="display:none">いまは「お試しモード」です。発行したコードはこのパソコンの中だけに保存され、部内で共有されません。（設定タブで変更できます）</div>
+<nav>
+  <button data-tab="issue" class="active">① クーポンを発行する</button>
+  <button data-tab="ledger">② 発行済み一覧を見る</button>
+  <button data-tab="settings">⚙ 設定</button>
+</nav>
+
+<main>
+<!-- 発行 -->
+<section id="tab-issue" class="active">
+  <h2>クーポンを発行する</h2>
+  <div class="grid">
+    <label for="fProduct" class="req">検定</label>
+    <select id="fProduct"></select>
+
+    <label for="fCategory" class="req">区分</label>
+    <select id="fCategory"></select>
+
+    <label for="fDate" class="req">日付（コードに入る日付）</label>
+    <div><input type="date" id="fDate"><div class="hint">ふつうは今日のままでOKです</div></div>
+
+    <label for="fCount" class="req">発行する枚数</label>
+    <div><input type="number" id="fCount" min="1" max="100" value="1"> 枚</div>
+
+    <label for="fName" class="req">配布先（氏名）</label>
+    <input id="fName" placeholder="例）山田 太郎">
+
+    <label for="fOrg">配布先（会社・学校名）</label>
+    <input id="fOrg" placeholder="例）株式会社サンプル">
+
+    <label for="fEmail">配布先（メール）</label>
+    <input id="fEmail" type="email" placeholder="例）yamada@example.com">
+
+    <label for="fDiscount" class="req">割引内容</label>
+    <select id="fDiscount"></select>
+
+    <label for="fExpires" class="req">有効期限</label>
+    <input type="date" id="fExpires">
+
+    <label for="fNote">メモ</label>
+    <input id="fNote" placeholder="例）〇〇セミナー参加特典">
+
+    <label>コードの見本</label>
+    <div class="preview" id="preview"></div>
+  </div>
+  <div class="actions"><button class="btn" id="btnIssue">発行する</button></div>
+  <div id="msg"></div>
+  <div class="result" id="result" style="display:none">
+    <h3>発行したコード</h3>
+    <ul id="resultList"></ul>
+    <button class="btn sub" id="btnCopyAll">すべてコピー</button>
+  </div>
+</section>
+
+<!-- 台帳 -->
+<section id="tab-ledger">
+  <h2>発行済み一覧</h2>
+  <div class="toolbar">
+    <label>年 <select id="lYear"></select></label>
+    <input type="search" id="lSearch" placeholder="コード・氏名・会社名などで検索">
+    <button class="btn sub" id="btnReload">最新にする</button>
+    <button class="btn sub" id="btnCsv">CSVでダウンロード</button>
+  </div>
+  <div class="hint" id="lCount"></div>
+  <div class="tablewrap"><table id="lTable"></table></div>
+</section>
+
+<!-- 設定 -->
+<section id="tab-settings">
+  <h2>設定</h2>
+  <p class="hint">管理者が最初に一度だけ設定します。ふだん使う人は触らなくて大丈夫です。</p>
+  <div class="grid">
+    <label for="sMode">保存先</label>
+    <select id="sMode">
+      <option value="demo">お試しモード（このパソコンだけ）</option>
+      <option value="github">GitHub Enterprise Server（部内で共有）</option>
+    </select>
+
+    <label for="sApi">API の URL</label>
+    <div><input id="sApi" placeholder="https://github.example.co.jp/api/v3"><div class="hint">GHES は https://ホスト名/api/v3 、github.com は https://api.github.com</div></div>
+
+    <label for="sOwner">オーナー（組織名）</label>
+    <input id="sOwner" placeholder="learning-support">
+
+    <label for="sRepo">リポジトリ名</label>
+    <input id="sRepo" placeholder="coupon-ledger">
+
+    <label for="sBranch">ブランチ</label>
+    <input id="sBranch" placeholder="main">
+
+    <label for="sLedger">台帳ファイル</label>
+    <div><input id="sLedger" placeholder="coupons/coupons-{year}.csv"><div class="hint">{year} は年に置き換わります（1年ごとにファイルを分けます）</div></div>
+
+    <label for="sConfig">選択肢の設定ファイル</label>
+    <div><input id="sConfig" placeholder="coupons/config.json"><div class="hint">検定・区分・割引の選択肢。無ければツール内の初期値を使います</div></div>
+
+    <label for="sToken">個人アクセストークン</label>
+    <div><input id="sToken" type="password" placeholder="ghp_..."><div class="hint">このパソコンのブラウザにだけ保存されます。リポジトリの読み書き（contents: write）権限が必要です</div></div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="btnSave">保存して接続テスト</button>
+  </div>
+  <div id="sMsg" class="hint" style="margin-top:12px;white-space:pre-wrap"></div>
+</section>
+</main>
+
+<script>
+"use strict";
+/* ============================================================
+ * 管理者向け: 部員に配る前にここを書き換えておくと、
+ * 部員はトークンを入れるだけで使えます。
+ * ============================================================ */
+const DEFAULT_SETTINGS = {
+  mode: "demo",                       // "demo" | "github"
+  api: "",                            // 例 "https://github.example.co.jp/api/v3"
+  owner: "",
+  repo: "",
+  branch: "main",
+  ledger: "coupons/coupons-{year}.csv",
+  config: "coupons/config.json",
+};
+
+// config.json が無いときの選択肢（例）
+const DEFAULT_CONFIG = {
+  products:   [ { code: "scb", label: "SCB検定（例）" } ],
+  categories: [ { code: "biz", label: "法人" }, { code: "edu", label: "教育機関" }, { code: "ind", label: "個人" } ],
+  discounts:  [ "受験料 100%割引", "受験料 50%割引", "受験料 3,000円引き" ],
+  randomLength: 8,
+  // 紛らわしい文字 (0,o,1,l,i) を除いた英小文字＋数字
+  randomChars: "abcdefghjkmnpqrstuvwxyz23456789",
+  defaultExpireDays: 90,
+};
+
+const COLUMNS = ["code","product","date_part","category","issued_at","issued_by",
+  "recipient_name","recipient_org","recipient_email","discount","expires_on","note"];
+const COLUMN_LABELS = {
+  code:"コード", product:"検定", date_part:"日付", category:"区分", issued_at:"発行日時",
+  issued_by:"発行者", recipient_name:"配布先", recipient_org:"会社・学校",
+  recipient_email:"メール", discount:"割引", expires_on:"有効期限", note:"メモ" };
+
+/* ---------- 小物 ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const pad = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const nowIso = () => { const d = new Date(); return `${ymd(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const store = {
+  get(k, def) { try { const v = localStorage.getItem(k); return v == null ? def : JSON.parse(v); } catch { return def; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+/* ---------- コード生成 ---------- */
+function randomString(len, chars) {
+  const out = [];
+  const max = 256 - (256 % chars.length);   // 偏りを無くすための棄却サンプリング
+  while (out.length < len) {
+    const buf = new Uint8Array(len * 2);
+    crypto.getRandomValues(buf);
+    for (const b of buf) { if (b < max && out.length < len) out.push(chars[b % chars.length]); }
+  }
+  return out.join("");
+}
+function datePart(isoDate) { // "2026-09-18" -> "260918"
+  const [y, m, d] = isoDate.split("-");
+  return y.slice(2) + m + d;
+}
+function buildCode(cfg, product, isoDate, category) {
+  return `${product}${datePart(isoDate)}-${category}-${randomString(cfg.randomLength, cfg.randomChars)}`;
+}
+
+/* ---------- CSV ---------- */
+function toCsv(rows) {
+  const q = (v) => { v = String(v ?? ""); return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  return "﻿" + [COLUMNS.join(","), ...rows.map(r => COLUMNS.map(c => q(r[c])).join(","))].join("\r\n") + "\r\n";
+}
+function parseCsv(text) {
+  text = text.replace(/^﻿/, "");
+  const recs = []; let row = [], f = "", i = 0, inQ = false;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i+1] === '"') { f += '"'; i++; } else inQ = false; }
+      else f += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i+1] === "\n") i++;
+      row.push(f); f = ""; recs.push(row); row = [];
+    } else f += c;
+    i++;
+  }
+  if (f !== "" || row.length) { row.push(f); recs.push(row); }
+  const nonEmpty = recs.filter(r => !(r.length === 1 && r[0] === ""));
+  if (!nonEmpty.length) return [];
+  const head = nonEmpty[0];
+  return nonEmpty.slice(1).map(r => Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""])));
+}
+
+/* ---------- UTF-8 <-> Base64 ---------- */
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str); let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64decode(b64) {
+  const bin = atob(b64.replace(/\s/g, ""));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+
+/* ---------- 保存先（アダプタ） ---------- */
+class DemoStorage {
+  async whoami() { return store.get("coupon.demoUser", "お試しユーザー"); }
+  async read(path) {
+    const v = store.get("coupon.demo:" + path, null);
+    return v ? { text: v.text, sha: v.sha } : null;
+  }
+  async write(path, text, sha /*, message */) {
+    const cur = store.get("coupon.demo:" + path, null);
+    if ((cur?.sha ?? null) !== (sha ?? null)) { const e = new Error("conflict"); e.conflict = true; throw e; }
+    store.set("coupon.demo:" + path, { text, sha: String(Date.now()) + Math.random() });
+  }
+}
+
+class GitHubStorage {
+  constructor(s) { this.s = s; }
+  url(path) { return `${this.s.api.replace(/\/+$/, "")}/repos/${encodeURIComponent(this.s.owner)}/${encodeURIComponent(this.s.repo)}/contents/${path.split("/").map(encodeURIComponent).join("/")}`; }
+  headers() { return { "Authorization": `Bearer ${this.s.token}`, "Accept": "application/vnd.github+json" }; }
+  async whoami() {
+    const r = await fetch(`${this.s.api.replace(/\/+$/, "")}/user`, { headers: this.headers() });
+    if (!r.ok) throw new Error(`ログイン確認に失敗しました（${r.status}）。トークンを確認してください。`);
+    const u = await r.json(); return u.name ? `${u.name} (${u.login})` : u.login;
+  }
+  async read(path) {
+    const r = await fetch(`${this.url(path)}?ref=${encodeURIComponent(this.s.branch)}`, { headers: this.headers(), cache: "no-store" });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`読み込みに失敗しました（${r.status}）: ${path}`);
+    const j = await r.json();
+    if (!j.content && j.size > 0) throw new Error(`${path} が大きすぎて読めません（1MB超）。台帳ファイルを分けてください。`);
+    return { text: b64decode(j.content || ""), sha: j.sha };
+  }
+  async write(path, text, sha, message) {
+    const body = { message, content: b64encode(text), branch: this.s.branch };
+    if (sha) body.sha = sha;
+    const r = await fetch(this.url(path), { method: "PUT", headers: { ...this.headers(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (r.status === 409 || r.status === 422) { const e = new Error("conflict"); e.conflict = true; throw e; }
+    if (!r.ok) throw new Error(`保存に失敗しました（${r.status}）。書き込み権限を確認してください。`);
+  }
+}
+
+/* ---------- 状態 ---------- */
+let settings = { ...DEFAULT_SETTINGS, ...store.get("coupon.settings", {}) };
+let backend, cfg = DEFAULT_CONFIG, me = "";
+let ledgerRows = [];
+
+function makeBackend() {
+  backend = settings.mode === "github" ? new GitHubStorage(settings) : new DemoStorage();
+  $("demoBanner").style.display = settings.mode === "demo" ? "block" : "none";
+}
+const ledgerPath = (year) => settings.ledger.replace("{year}", year);
+
+async function loadConfig() {
+  cfg = DEFAULT_CONFIG;
+  if (settings.mode === "github" && settings.config) {
+    try {
+      const f = await backend.read(settings.config);
+      if (f) cfg = { ...DEFAULT_CONFIG, ...JSON.parse(f.text) };
+    } catch (e) { showMsg("ng", "選択肢の設定ファイルを読めませんでした。初期値で表示します。\n" + e.message); }
+  }
+  const opt = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`;
+  $("fProduct").innerHTML  = cfg.products.map(p => opt(p.code, `${p.label}（${p.code}）`)).join("");
+  $("fCategory").innerHTML = cfg.categories.map(c => opt(c.code, `${c.label}（${c.code}）`)).join("");
+  $("fDiscount").innerHTML = cfg.discounts.map(d => opt(d, d)).join("");
+  const exp = new Date(); exp.setDate(exp.getDate() + (cfg.defaultExpireDays || 90));
+  if (!$("fExpires").value) $("fExpires").value = ymd(exp);
+  updatePreview();
+}
+
+function updatePreview() {
+  const p = $("fProduct").value, c = $("fCategory").value, d = $("fDate").value;
+  $("preview").textContent = p && c && d ? `${p}${datePart(d)}-${c}-${"x".repeat(cfg.randomLength)}` : "";
+}
+
+function showMsg(kind, text) { const m = $("msg"); m.className = kind; m.textContent = text; }
+
+/* ---------- 発行 ---------- */
+async function issue() {
+  const f = {
+    product: $("fProduct").value, category: $("fCategory").value, date: $("fDate").value,
+    count: parseInt($("fCount").value, 10), name: $("fName").value.trim(), org: $("fOrg").value.trim(),
+    email: $("fEmail").value.trim(), discount: $("fDiscount").value, expires: $("fExpires").value, note: $("fNote").value.trim(),
+  };
+  const errs = [];
+  if (!f.product || !f.category) errs.push("検定と区分を選んでください");
+  if (!f.date) errs.push("日付を入れてください");
+  if (!(f.count >= 1 && f.count <= 100)) errs.push("枚数は 1〜100 で入れてください");
+  if (!f.name) errs.push("配布先（氏名）を入れてください");
+  if (!f.expires) errs.push("有効期限を入れてください");
+  if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) errs.push("メールアドレスの形が正しくありません");
+  if (errs.length) { showMsg("ng", errs.join("\n")); return; }
+
+  const btn = $("btnIssue"); btn.disabled = true; btn.textContent = "発行中…";
+  showMsg("info", "発行しています。画面を閉じずにお待ちください…");
+  const year = new Date().getFullYear();
+  const path = ledgerPath(year);
+  try {
+    for (let attempt = 1; ; attempt++) {
+      const file = await backend.read(path);
+      const rows = file ? parseCsv(file.text) : [];
+      const used = new Set(rows.map(r => r.code));
+      const issuedAt = nowIso(), newRows = [];
+      while (newRows.length < f.count) {
+        const code = buildCode(cfg, f.product, f.date, f.category);
+        if (used.has(code)) continue;
+        used.add(code);
+        newRows.push({ code, product: f.product, date_part: datePart(f.date), category: f.category,
+          issued_at: issuedAt, issued_by: me, recipient_name: f.name, recipient_org: f.org,
+          recipient_email: f.email, discount: f.discount, expires_on: f.expires, note: f.note });
+      }
+      try {
+        await backend.write(path, toCsv([...rows, ...newRows]), file?.sha,
+          `クーポン発行 ${f.count}件: ${f.name}${f.org ? "（" + f.org + "）" : ""} by ${me}`);
+        showResult(newRows);
+        showMsg("ok", `${f.count}件 発行して、台帳に保存しました。`);
+        break;
+      } catch (e) {
+        // 同時に誰かが発行していたら、読み直してやり直す
+        if (e.conflict && attempt < 5) { await new Promise(r => setTimeout(r, 300 * attempt + Math.random() * 300)); continue; }
+        throw e;
+      }
+    }
+  } catch (e) {
+    showMsg("ng", "発行できませんでした（コードは保存されていません）。\n" + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "発行する";
+  }
+}
+
+function showResult(rows) {
+  $("result").style.display = "block";
+  $("resultList").innerHTML = rows.map(r =>
+    `<li><code>${esc(r.code)}</code><button class="btn sub" data-copy="${esc(r.code)}">コピー</button></li>`).join("");
+  $("btnCopyAll").onclick = () => copy(rows.map(r => r.code).join("\n"), $("btnCopyAll"));
+}
+async function copy(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+  const old = btn.textContent; btn.textContent = "コピーしました ✓"; setTimeout(() => btn.textContent = old, 1500);
+}
+
+/* ---------- 台帳 ---------- */
+async function loadLedger() {
+  $("lCount").textContent = "読み込み中…";
+  try {
+    const f = await backend.read(ledgerPath($("lYear").value));
+    ledgerRows = f ? parseCsv(f.text) : [];
+    renderLedger();
+  } catch (e) { $("lCount").textContent = e.message; }
+}
+function renderLedger() {
+  const q = $("lSearch").value.trim().toLowerCase();
+  const rows = ledgerRows.filter(r => !q || COLUMNS.some(c => String(r[c] ?? "").toLowerCase().includes(q))).slice().reverse();
+  const show = ["code","issued_at","issued_by","recipient_name","recipient_org","discount","expires_on","note"];
+  $("lTable").innerHTML = `<thead><tr>${show.map(c => `<th>${COLUMN_LABELS[c]}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(r => `<tr>${show.map(c => `<td>${c === "code" ? `<code>${esc(r[c])}</code>` : esc(r[c])}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  $("lCount").textContent = `${rows.length} 件${q ? `（全 ${ledgerRows.length} 件中）` : ""}　新しい順`;
+}
+function downloadCsv() {
+  const blob = new Blob([toCsv(ledgerRows)], { type: "text/csv" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `coupons-${$("lYear").value}.csv`; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ---------- 設定 ---------- */
+const SETTING_FIELDS = { sMode:"mode", sApi:"api", sOwner:"owner", sRepo:"repo", sBranch:"branch", sLedger:"ledger", sConfig:"config", sToken:"token" };
+function fillSettings() { for (const [id, k] of Object.entries(SETTING_FIELDS)) $(id).value = settings[k] ?? ""; }
+async function saveSettings() {
+  for (const [id, k] of Object.entries(SETTING_FIELDS)) settings[k] = $(id).value.trim();
+  if (settings.mode === "github" && !(settings.api && settings.owner && settings.repo && settings.token)) {
+    $("sMsg").textContent = "GitHub を使うには API の URL・オーナー・リポジトリ名・トークンが必要です。"; return;
+  }
+  store.set("coupon.settings", settings);
+  $("sMsg").textContent = "接続テスト中…";
+  await init();
+  $("sMsg").textContent = me ? `保存しました。「${me}」として接続できました。` : $("sMsg").textContent;
+}
+
+/* ---------- 起動 ---------- */
+async function init() {
+  makeBackend();
+  try {
+    me = await backend.whoami();
+    $("who").textContent = `発行者: ${me}`;
+  } catch (e) {
+    me = ""; $("who").textContent = "未接続";
+    $("sMsg").textContent = e.message;
+    showMsg("ng", "保存先に接続できません。設定タブを確認してください。\n" + e.message);
+    return;
+  }
+  await loadConfig();
+}
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("active", s.id === "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "ledger") loadLedger();
+  if (b.dataset.tab === "settings") fillSettings();
+});
+["fProduct","fCategory","fDate"].forEach(id => $(id).addEventListener("input", updatePreview));
+$("btnIssue").onclick = () => { if (!me) { showMsg("ng", "保存先に接続できていません。設定タブを確認してください。"); return; } issue(); };
+$("resultList").addEventListener("click", e => { const b = e.target.closest("[data-copy]"); if (b) copy(b.dataset.copy, b); });
+$("lSearch").addEventListener("input", renderLedger);
+$("lYear").addEventListener("change", loadLedger);
+$("btnReload").onclick = loadLedger;
+$("btnCsv").onclick = downloadCsv;
+$("btnSave").onclick = saveSettings;
+
+(function boot() {
+  $("fDate").value = ymd(new Date());
+  const y = new Date().getFullYear();
+  $("lYear").innerHTML = [y, y-1, y-2].map(v => `<option>${v}</option>`).join("");
+  init();
+})();
+</script>
+</body>
+</html>
