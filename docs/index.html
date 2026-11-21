@@ -146,7 +146,7 @@
     <select id="fDiscount"></select>
 
     <label for="fExpires" class="req">有効期限日</label>
-    <div><input type="date" id="fExpires" style="width:220px"><div class="hint">この画面で追加するクーポンすべてに付きます。受検日より前の日付にはできません</div></div>
+    <div><input type="date" id="fExpires" style="width:220px"><div class="hint">この画面で追加するクーポンすべてに付きます。クーポンは申込期間中に使うため、受検日より前の日付にしてください（受検日が複数あるときは、いちばん早い受検日より前）</div></div>
 
     <label for="fRequester">依頼元・用途</label>
     <div><input id="fRequester" list="requesterList" placeholder="例）営業部"><datalist id="requesterList"></datalist>
@@ -564,7 +564,8 @@ function addToCart() {
   if (!["percent", "fixed_cart"].includes(dc.type) || !(dc.value > 0)) errs.push(`割引内容「${discount}」の割引区分・割引値が設定されていません（config.json を確認してください）`);
   if (!expires) errs.push("有効期限日を入れてください");
   else if (expires < today) errs.push(`有効期限日が過去の日付（${expires}）になっています`);
-  else if (dates.length && expires < dates[dates.length - 1]) errs.push(`有効期限日（${expires}）が受検日（${dates[dates.length - 1]}）より前になっています`);
+  // クーポンを使えるのは申込期間中（受検日より前）なので、有効期限日は最も早い受検日の前日まで
+  else if (dates.length && expires >= dates[0]) errs.push(`有効期限日（${expires}）が受検日（${dates[0]}）と同じか後になっています。クーポンは申込期間中に使うものなので、受検日より前の日付にしてください`);
   const seen = new Set();
   orgs.forEach(o => { const k = normOrg(o.org); if (seen.has(k)) errs.push(`配布先「${o.org}」が2回入っています`); seen.add(k); });
   if (errs.length) { showMsg("msg", "ng", [...new Set(errs)].join("\n")); return; }
@@ -605,7 +606,7 @@ function cartIssues() {
     }
     if (it.exam_date < today) return `受検日が過去です`;
     if (!it.expires_on || !it.max_users) return `有効期限日・利用者数がありません（削除して追加し直してください）`;
-    if (it.expires_on < it.exam_date) return `有効期限日が受検日より前です`;
+    if (it.expires_on >= it.exam_date) return `有効期限日が受検日と同じか後です（受検日より前にしてください）`;
     if (!it.discount_type || !(it.discount_value > 0)) return `割引区分・割引値がありません（削除して追加し直してください）`;
     const dup = me ? findDuplicate(it) : null;
     return dup ? `発行済みあり：${dup.code}（${STATUS_TEXT[dup.status]}）` : "";
