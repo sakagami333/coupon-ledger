@@ -174,7 +174,7 @@
 ### config.json の書き方（割引・メモ用の検定名）
 ```json
 "products": [
-  { "code": "scb", "label": "クラウド検定ベーシック", "memoName": "さくらのクラウド検定 ベーシック" }
+  { "code": "scb", "label": "クラウド検定ベーシック", "memoName": "クラウド検定 ベーシック" }
 ],
 "discounts": [
   { "label": "受験料 100%割引", "type": "percent",    "value": 100 },
