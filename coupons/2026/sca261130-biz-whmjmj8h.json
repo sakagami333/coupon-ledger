@@ -1,0 +1,18 @@
+{
+  "code": "sca261130-biz-whmjmj8h",
+  "code_source": "generated",
+  "product": "sca",
+  "exam_date": "2026-11-30",
+  "category": "biz",
+  "issued_at": "2026-11-23 08:12:15",
+  "issued_by": "Kimi Sakagami (sakagami333)",
+  "recipient_org": "test株式会社",
+  "max_users": 10,
+  "email_restriction": "",
+  "expires_on": "2026-11-27",
+  "requester": "",
+  "discount": "受験料 20%割引",
+  "discount_type": "percent",
+  "discount_value": 20,
+  "note": "テスト"
+}
