@@ -6,7 +6,7 @@
 <title>検定クーポン発行ツール</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;500&display=swap">
 <style>
   :root { --main:#1f5fbf; --bg:#f4f6fa; --line:#d5dbe5; --ok:#1d7a3e; --ng:#b3261e; --wait:#a15c00; --del:#6a3fb5; }
   * { box-sizing: border-box; }
@@ -118,118 +118,137 @@
   input[type=date] { width:180px !important; flex:none; }
 
   /* ===================================================================
-   * Linear 風テーマ（以下で上の見た目を上書き）
+   * Apple HIG 風テーマ（以下で上の見た目を上書き）
    * =================================================================== */
-/* ===== Linear 風テーマ ===== */
+/* ===== Apple HIG 風テーマ（試作） ===== */
 :root {
-  --main:#5e6ad2; --main-hover:#4f5bc4; --ring:rgba(94,106,210,.28);
-  --bg:#f7f8f9; --panel:#ffffff; --line:#e6e8eb; --line-strong:#d6d9de;
-  --text:#1f2328; --text-2:#3c4149; --muted:#6b6f76; --faint:#8a8f98;
-  --ok:#2f8f5b; --ng:#d14343; --wait:#c47f17; --del:#7c5cc4;
-  --hover-line:#c4c8cf;
-  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
-  --sans:"Inter", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --main:#007aff; --main-hover:#0066d6; --ring:rgba(0,122,255,.30);
+  --bg:#f2f2f7; --panel:#ffffff; --line:rgba(60,60,67,.18); --line-strong:rgba(60,60,67,.29);
+  --fill:rgba(118,118,128,.12); --fill-2:rgba(118,118,128,.08);
+  --text:#000; --text-2:#1c1c1e; --muted:rgba(60,60,67,.6); --faint:rgba(60,60,67,.36);
+  --ok:#34c759; --ok-text:#248a3d; --ng:#ff3b30; --wait:#ff9500; --wait-text:#c93400; --del:#af52de;
+  --bar:rgba(249,249,249,.78);
+  --sans:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+  --mono:"Noto Sans Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 }
-/* ダーク：パソコンの設定に合わせる（html に data-theme="light"/"dark" を付けると手動で固定できる） */
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) { --bg:#0f1011; --panel:#16171a; --line:#23252a; --line-strong:#2e3036;
-  --text:#e6e7ea; --text-2:#c9cbd1; --muted:#8a8f98; --faint:#62666d;
-  --ring:rgba(122,132,230,.35); --hover-line:#3a3d44; color-scheme:dark; }
+  html:not([data-theme="light"]) { --main:#0a84ff; --main-hover:#409cff; --bg:#000; --panel:#1c1c1e; --line:rgba(84,84,88,.6); --line-strong:rgba(84,84,88,.8);
+    --fill:rgba(118,118,128,.24); --fill-2:rgba(118,118,128,.16); --text:#fff; --text-2:#f2f2f7; --muted:rgba(235,235,245,.6); --faint:rgba(235,235,245,.3);
+    --ok:#30d158; --ok-text:#30d158; --ng:#ff453a; --wait:#ff9f0a; --wait-text:#ff9f0a; --del:#bf5af2; --bar:rgba(22,22,24,.72); color-scheme:dark; }
 }
-html[data-theme="dark"] { --bg:#0f1011; --panel:#16171a; --line:#23252a; --line-strong:#2e3036;
-  --text:#e6e7ea; --text-2:#c9cbd1; --muted:#8a8f98; --faint:#62666d;
-  --ring:rgba(122,132,230,.35); --hover-line:#3a3d44; color-scheme:dark; }
-body { font-family:var(--sans); background:var(--bg); color:var(--text); font-size:13px; letter-spacing:-0.005em;
-  -webkit-font-smoothing:antialiased; }
-header { background:var(--panel); color:var(--text); border-bottom:1px solid var(--line); padding:10px 20px; }
-header h1 { font-size:14px; font-weight:600; display:flex; align-items:center; gap:10px; }
-header h1::before { content:""; width:20px; height:20px; border-radius:6px;
-  background:linear-gradient(135deg,#7c86ea,#5e6ad2 55%,#4250b8); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
-#who { color:var(--text-2); font-size:12.5px; }
-#who .login { color:var(--faint); opacity:1; }
-#who .avatar { width:20px; height:20px; }
-nav { background:var(--panel); border-bottom:1px solid var(--line); padding:6px 16px; gap:2px; }
-nav button { padding:6px 12px; font-size:13px; color:var(--muted); border:none; border-radius:6px; font-family:inherit; }
-nav button:hover { background:var(--bg); color:var(--text); }
-nav button.active { background:var(--bg); color:var(--text); font-weight:500; border-bottom:none; box-shadow:inset 0 0 0 1px var(--line); }
-nav .badge { background:var(--main); font-size:11px; padding:0 6px; }
-main { margin:20px auto; }
-section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px 24px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
-h2 { font-size:15px; font-weight:600; color:var(--text); margin:0 0 10px; }
-h3 { font-size:12px; font-weight:600; color:var(--muted); border-left:none; padding-left:0; margin:22px 0 10px;
-  letter-spacing:.02em; display:flex; align-items:center; gap:8px; }
-h3::after { content:""; flex:1; height:1px; background:var(--line); }
-.flow { background:var(--bg); border:1px solid var(--line); border-radius:8px; color:var(--muted); font-size:12px; }
+html[data-theme="dark"] { --main:#0a84ff; --main-hover:#409cff; --bg:#000; --panel:#1c1c1e; --line:rgba(84,84,88,.6); --line-strong:rgba(84,84,88,.8);
+    --fill:rgba(118,118,128,.24); --fill-2:rgba(118,118,128,.16); --text:#fff; --text-2:#f2f2f7; --muted:rgba(235,235,245,.6); --faint:rgba(235,235,245,.3);
+    --ok:#30d158; --ok-text:#30d158; --ng:#ff453a; --wait:#ff9f0a; --wait-text:#ff9f0a; --del:#bf5af2; --bar:rgba(22,22,24,.72); color-scheme:dark; }
+
+body { font-family:var(--sans); background:var(--bg); color:var(--text); font-size:14px; letter-spacing:0; -webkit-font-smoothing:antialiased; }
+
+/* 上部バー：半透明＋ぼかし（マテリアル） */
+header { position:sticky; top:0; z-index:10; background:var(--bar); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:.5px solid var(--line); color:var(--text); padding:10px 24px; }
+header h1 { font-size:15px; font-weight:600; display:flex; align-items:center; gap:10px; }
+header h1::before { content:""; width:22px; height:22px; border-radius:6px; background:linear-gradient(180deg,#5ac8fa,#007aff); box-shadow:none; }
+#who { color:var(--muted); font-size:13px; }
+#who .login { color:var(--faint); }
+
+/* タブ：セグメントコントロール */
+nav { position:sticky; top:45px; z-index:9; background:var(--bar); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:.5px solid var(--line); padding:8px 0; justify-content:center; gap:0; }
+nav::before { content:none; }
+nav button { font-family:inherit; font-size:13px; font-weight:500; color:var(--text); padding:5px 18px; border:none; border-radius:7px; background:transparent; }
+nav { --seg-bg:var(--fill); }
+nav button { margin:0; }
+nav button:first-child { border-radius:7px; }
+nav button.active { background:var(--panel); box-shadow:0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); font-weight:600; border-bottom:none; color:var(--text); }
+nav:has(button) { }
+nav .badge { background:var(--ng); color:#fff; font-size:11px; padding:0 6px; border-radius:9px; }
+.navwrap { display:inline-flex; background:var(--fill); border-radius:9px; padding:2px; }
+
+/* ページ：大きなタイトル＋グループ化したリスト */
+main { margin:8px auto 40px; }
+section { background:transparent; border:none; box-shadow:none; padding:12px 4px; }
+h2 { font-size:28px; font-weight:700; letter-spacing:.01em; color:var(--text); margin:8px 0 14px; }
+h3 { font-size:13px; font-weight:400; color:var(--muted); border:none; padding:0 16px; margin:26px 0 7px; letter-spacing:0; }
+h3::after { content:none; }
+.flow { background:transparent; border:none; padding:0 16px; color:var(--muted); font-size:12.5px; line-height:1.6; margin-bottom:6px; }
 .flow b { color:var(--text-2); font-weight:600; }
-.grid { gap:8px 16px; grid-template-columns:160px 1fr; }
-.grid > label { color:var(--text-2); font-weight:500; font-size:12.5px; padding-top:7px; }
-.req::after { content:" 必須"; color:var(--faint); font-size:10.5px; font-weight:500; margin-left:2px; }
-input, select, textarea { font-family:inherit; font-size:13px; color:var(--text); background:var(--panel);
-  border:1px solid var(--line-strong); border-radius:6px; padding:5px 9px; height:30px; transition:border-color .12s, box-shadow .12s; }
-input:hover, select:hover { border-color:var(--hover-line); }
-input:focus, select:focus { outline:none; border-color:var(--main); box-shadow:0 0 0 3px var(--ring); }
+
+/* フォーム：インセットグループ（左に項目名、右に入力欄、行の間に細い区切り線） */
+.grid { background:var(--panel); border-radius:12px; grid-template-columns:170px 1fr; gap:0; padding:0 16px; max-width:960px; }
+.grid > label, .grid > label + * { padding:11px 0; border-top:.5px solid var(--line); }
+.grid > label:first-child, .grid > label:first-child + * { border-top:none; }
+.grid > label { color:var(--text); font-weight:400; font-size:14px; padding-top:16px; }
+.req::after { content:""; display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--ng); margin-left:6px; vertical-align:middle; }
+input, select, textarea { font-family:inherit; font-size:14px; color:var(--text); background:var(--fill-2); border:none; border-radius:8px; padding:6px 10px; height:32px; transition:box-shadow .15s, background .15s; }
+input:hover, select:hover { background:var(--fill); }
+input:focus, select:focus { outline:none; background:var(--panel); box-shadow:0 0 0 3.5px var(--ring), 0 0 0 1px var(--main); }
 input::placeholder { color:var(--faint); font-style:normal; }
-input.missing { border-color:var(--ng); background:transparent; box-shadow:0 0 0 3px rgba(209,67,67,.15); }
-select { appearance:none; padding-right:26px;
+input.missing { box-shadow:0 0 0 1px var(--ng), 0 0 0 3.5px rgba(255,59,48,.2); background:transparent; }
+select { appearance:none; padding-right:28px;
   background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
-  background-position:calc(100% - 13px) 12px, calc(100% - 9px) 12px; background-size:4px 4px; background-repeat:no-repeat; }
-input[type=date], #fExpires, .preview, code, .cartCode, .fUsers { font-family:var(--mono); font-size:12.5px; }
-.hint { color:var(--faint); font-size:11.5px; margin-top:4px; }
-.preview { background:var(--bg); border:1px dashed var(--line-strong); color:var(--text-2); padding:5px 10px; height:30px; border-radius:6px; letter-spacing:.02em; }
-.row { gap:6px; margin-bottom:6px; }
-.row .x { width:30px; height:30px; border-radius:6px; border:1px solid var(--line-strong); background:var(--panel); color:var(--faint); }
-.row .x:hover { color:var(--ng); border-color:var(--ng); }
-.row .unit { color:var(--faint); font-size:12px; }
-.btn { font-family:inherit; background:var(--main); color:#fff; border:1px solid var(--main); border-radius:6px;
-  padding:0 14px; height:32px; font-size:13px; font-weight:500; box-shadow:0 1px 1px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.12); }
+  background-position:calc(100% - 14px) 13px, calc(100% - 9px) 13px; background-size:5px 5px; background-repeat:no-repeat; }
+input[type=date], #fExpires, .preview, code, .cartCode, .fUsers { font-family:var(--mono); font-size:13px; }
+.hint { color:var(--muted); font-size:12px; margin-top:5px; line-height:1.5; }
+.preview { background:transparent; border:none; padding:6px 0; color:var(--muted); height:auto; letter-spacing:.03em; }
+.row { gap:8px; margin-bottom:8px; }
+.row .x { width:28px; height:28px; border:none; border-radius:50%; background:var(--fill); color:var(--muted); font-size:13px; }
+.row .x:hover { background:rgba(255,59,48,.15); color:var(--ng); }
+.row .unit { color:var(--muted); }
+
+/* ボタン：塗り（主）・薄い色付き（副）・赤文字（削除） */
+.btn { font-family:inherit; background:var(--main); color:#fff; border:none; border-radius:10px; padding:0 18px; height:36px; font-size:15px; font-weight:600; box-shadow:none; }
 .btn:hover { background:var(--main-hover); }
-.btn:disabled { background:var(--line-strong); border-color:var(--line-strong); color:var(--faint); }
-.btn.sub { background:var(--panel); color:var(--text-2); border:1px solid var(--line-strong); height:28px; padding:0 10px; font-size:12.5px; box-shadow:0 1px 1px rgba(0,0,0,.04); }
-.btn.sub:hover { background:var(--bg); }
-.btn.sm { height:24px; padding:0 8px; font-size:12px; }
-.btn.warn { background:var(--panel); color:var(--ng); border:1px solid var(--line-strong); }
-.btn.warn:hover { border-color:var(--ng); }
-.btn.go { background:var(--ok); border-color:var(--ok); color:#fff; }
-.btn.plain { background:var(--panel); color:var(--text-2); border:1px solid var(--line-strong); }
-.actions { margin-top:16px; }
-.msg { border-radius:8px; font-size:12.5px; padding:9px 12px; border:1px solid; }
-.msg.ok { background:rgba(47,143,91,.07); color:var(--ok); border-color:rgba(47,143,91,.25); }
-.msg.ng { background:rgba(209,67,67,.06); color:var(--ng); border-color:rgba(209,67,67,.25); font-weight:500; }
-.msg.info { background:rgba(94,106,210,.06); color:var(--main); border-color:rgba(94,106,210,.25); }
-.result { border:1px solid rgba(196,127,23,.35); background:rgba(196,127,23,.05); border-radius:10px; }
-.result .warnline { color:var(--wait); }
-table { font-size:12.5px; }
-th { background:var(--panel); color:var(--muted); font-weight:500; font-size:11.5px; border-bottom:1px solid var(--line); padding:7px 8px; }
-td { border-bottom:1px solid var(--line); padding:7px 8px; color:var(--text-2); }
-tbody tr:hover td { background:var(--bg); }
-tr.dup td { background:rgba(209,67,67,.05); }
-.tablewrap { border:1px solid var(--line); border-radius:8px; }
-.st { font-weight:500; font-size:11.5px; padding:1px 8px 1px 7px; border-radius:999px; background:transparent !important;
-  border:1px solid var(--line-strong); color:var(--text-2) !important; display:inline-flex; align-items:center; gap:5px; }
-.st::before { content:""; width:7px; height:7px; border-radius:50%; }
-.st.done::before { background:var(--ok); }
-.st.wait::before { background:transparent; border:1.5px solid var(--wait); width:5px; height:5px; }
-.st.chg::before { background:var(--ng); }
-.st.del::before { background:var(--del); }
-.st.gone::before { background:var(--faint); }
-.sub { color:var(--faint); font-size:11px; }
-.ngtext { color:var(--ng); font-weight:500; font-size:12px; }
-.oktext { color:var(--ok); font-size:12px; }
-#cartTable .cartCode { height:26px; font-size:12px; }
-#cartTable .cartCode:not(:placeholder-shown) { background:rgba(94,106,210,.06); border-color:rgba(94,106,210,.45); }
-.toolbar select, .toolbar input { height:30px; }
-#sMsg.ok, #sMsg.ng { font-size:12.5px; border-radius:8px; }
-kbd { font-family:var(--mono); font-size:11px; padding:1px 5px; border:1px solid var(--line-strong); border-bottom-width:2px; border-radius:4px; color:var(--muted); background:var(--panel); }
-.toolbar .btn { height:30px; }
-#btnImportCsv { padding:0 12px; font-size:12.5px; }
-#lTable td:nth-child(6), #lTable td:nth-child(7), #lTable td:nth-child(8), #lTable td:nth-child(9) { white-space:nowrap; }
-#lTable th { white-space:nowrap; }
-#sMsg.ok, #sMsg.ng { font-weight:500; padding:9px 12px; border:1px solid; }
-#sMsg.ok { background:rgba(47,143,91,.07); color:var(--ok); border-color:rgba(47,143,91,.25); }
-#sMsg.ng { background:rgba(209,67,67,.06); color:var(--ng); border-color:rgba(209,67,67,.25); }
+.btn:active { opacity:.8; }
+.btn:disabled { background:var(--fill); color:var(--faint); }
+.btn.sub { background:rgba(0,122,255,.12); color:var(--main); border:none; height:30px; padding:0 12px; font-size:13px; font-weight:500; border-radius:8px; }
+.btn.sub:hover { background:rgba(0,122,255,.18); }
+.btn.sm { height:26px; padding:0 10px; font-size:12px; border-radius:7px; }
+.btn.warn { background:rgba(255,59,48,.12); color:var(--ng); border:none; }
+.btn.go { background:var(--ok); color:#fff; border:none; }
+.btn.plain { background:var(--fill); color:var(--text); border:none; }
+.actions { margin-top:18px; max-width:960px; }
+
+/* メッセージ */
+.msg { border:none; border-radius:12px; font-size:13px; padding:11px 16px; max-width:960px; }
+.msg.ok { background:rgba(52,199,89,.14); color:var(--ok-text); }
+.msg.ng { background:rgba(255,59,48,.12); color:var(--ng); font-weight:500; }
+.msg.info { background:rgba(0,122,255,.10); color:var(--main); }
+.result { border:none; background:var(--panel); border-radius:12px; padding:16px; }
+.result .warnline { color:var(--wait-text); font-weight:600; }
+.result table { background:transparent; }
+
+/* 表：グループ化したリスト風 */
+.tablewrap { background:var(--panel); border-radius:12px; border:none; }
+table { font-size:13px; }
+th { background:var(--panel); color:var(--muted); font-weight:500; font-size:12px; border-bottom:.5px solid var(--line); padding:9px 10px; }
+td { border-bottom:.5px solid var(--line); padding:10px; color:var(--text); }
+tbody tr:last-child td { border-bottom:none; }
+tbody tr:hover td { background:var(--fill-2); }
+tr.dup td { background:rgba(255,59,48,.07); }
 tr.muted td { color:var(--faint); }
-.result table { background:var(--panel); }
-a.btn { line-height:24px; }
+.st { font-weight:600; font-size:11.5px; padding:2px 9px; border-radius:999px; border:none; }
+.st::before { content:none; }
+.st.done { background:rgba(52,199,89,.16); color:var(--ok-text) !important; }
+.st.wait { background:rgba(255,149,0,.16); color:var(--wait-text) !important; }
+.st.chg  { background:rgba(255,59,48,.14); color:var(--ng) !important; }
+.st.del  { background:rgba(175,82,222,.15); color:var(--del) !important; }
+.st.gone { background:var(--fill); color:var(--muted) !important; }
+.sub { color:var(--muted); font-size:11.5px; }
+.ngtext { color:var(--ng); font-weight:500; }
+.oktext { color:var(--ok-text); }
+#cartTable .cartCode { height:28px; }
+#cartTable .cartCode:not(:placeholder-shown) { background:rgba(0,122,255,.10); box-shadow:inset 0 0 0 1px rgba(0,122,255,.35); }
+.toolbar { gap:8px; }
+.toolbar select, .toolbar input { height:32px; }
+.toolbar input[type=search] { border-radius:10px; padding-left:12px; }
+.toolbar .btn { height:32px; }
+#sMsg.ok, #sMsg.ng { border:none; border-radius:12px; font-size:13px; }
+#sMsg.ok { background:rgba(52,199,89,.14); color:var(--ok-text); }
+#sMsg.ng { background:rgba(255,59,48,.12); color:var(--ng); }
+tr.muted td { color:var(--faint); }
+a.btn { line-height:26px; }
+.toolbar .btn { line-height:32px; height:32px; font-size:13px; padding:0 12px; border-radius:8px; }
+#lTable th { white-space:nowrap; }
+#lTable td:nth-child(6), #lTable td:nth-child(7), #lTable td:nth-child(8), #lTable td:nth-child(9) { white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -237,11 +256,11 @@ a.btn { line-height:24px; }
   <h1>検定クーポン発行ツール</h1>
   <span id="who"></span>
 </header>
-<nav>
+<nav><span class="navwrap">
   <button data-tab="issue" class="active">① クーポンを発行する</button>
   <button data-tab="ledger">② 発行済み一覧・確認状況 <span id="waitBadge" class="badge" style="display:none"></span></button>
   <button data-tab="settings">⚙ 設定</button>
-</nav>
+</span></nav>
 
 <main>
 <!-- 発行 -->
@@ -252,7 +271,7 @@ a.btn { line-height:24px; }
   <h3>1. 発行内容を入力</h3>
   <div class="grid">
     <label for="fProduct" class="req">検定</label>
-    <select id="fProduct"></select>
+    <div><select id="fProduct"></select></div>
 
     <label class="req">受検日</label>
     <div><div id="dateList"></div>
@@ -265,7 +284,7 @@ a.btn { line-height:24px; }
       <div class="hint">Excel などから「組織名」または「組織名｜利用者数」の2列を複数行コピーして、組織名の欄に貼り付けると、行ごとに分かれて入ります</div></div>
 
     <label for="fDiscount" class="req">割引内容</label>
-    <select id="fDiscount"></select>
+    <div><select id="fDiscount"></select></div>
 
     <label for="fExpires" class="req">有効期限日</label>
     <div><input type="date" id="fExpires" class="dateBox"><div class="hint">この画面で追加するクーポンすべてに付きます。クーポンは申込期間中に使うため、受検日より前の日付にしてください（受検日が複数あるときは、いちばん早い受検日より前）</div></div>
@@ -327,13 +346,13 @@ a.btn { line-height:24px; }
     <div><input id="sApi" placeholder="例）https://api.github.com"><div class="hint">GHES は https://ホスト名/api/v3 、github.com は https://api.github.com</div></div>
 
     <label for="sOwner">オーナー（組織名）</label>
-    <input id="sOwner" placeholder="例）learning-support">
+    <div><input id="sOwner" placeholder="例）learning-support"></div>
 
     <label for="sRepo">リポジトリ名</label>
-    <input id="sRepo" placeholder="例）coupon-ledger">
+    <div><input id="sRepo" placeholder="例）coupon-ledger"></div>
 
     <label for="sBranch">ブランチ</label>
-    <input id="sBranch" placeholder="例）main">
+    <div><input id="sBranch" placeholder="例）main"></div>
 
     <label for="sDir">クーポンを置くフォルダ</label>
     <div><input id="sDir" placeholder="例）coupons"><div class="hint">1クーポン＝1ファイルで「フォルダ/発行年/コード.json」に保存します</div></div>
