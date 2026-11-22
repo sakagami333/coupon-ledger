@@ -873,13 +873,13 @@ async function mergePr(code) {
   const isDel = cur.status === "del";
   const n = group.length;
   if (!confirm(isDel ? `クーポン ${code} の削除を確定しますか？`
-                     : `PR #${cur.pr.number} の ${n} 件をまとめて確定しますか？\n確定後、お客様に送付できます。`)) return;
+                     : `PR #${cur.pr.number} の ${n} 件をまとめて確定しますか？\n確定後、取り込み用CSVをダウンロードして、クーポン登録ツールで登録してください。`)) return;
   try {
     const batchCodes = new Set(group.map(g => g.code));
     await gh.merge(cur.pr.number, isDel ? `クーポン削除: ${code}（${cur.recipient_org}） #${cur.pr.number}` : `${cur.pr.title} #${cur.pr.number}`);
     await gh.deleteBranch(cur.pr.head.ref);
     await loadRecords(); renderLedger();
-    showMsg("lMsg", "ok", isDel ? `「${code}」を削除しました。` : `${n} 件を確定しました。お客様に送付できます。`);
+    showMsg("lMsg", "ok", isDel ? `「${code}」を削除しました。` : `${n} 件を確定しました。取り込み用CSVをダウンロードして、クーポン登録ツールで登録してください。`);
     if (!isDel) {
       const b = document.createElement("button"); b.className = "btn sm go"; b.style.marginLeft = "12px";
       b.textContent = `この ${n} 件の取り込み用CSVをダウンロード`;
