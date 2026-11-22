@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>検定クーポン発行ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap">
 <style>
   :root { --main:#1f5fbf; --bg:#f4f6fa; --line:#d5dbe5; --ok:#1d7a3e; --ng:#b3261e; --wait:#a15c00; --del:#6a3fb5; }
   * { box-sizing: border-box; }
@@ -113,11 +116,125 @@
   th, td { padding:5px 6px; font-size:13px; }
   /* 日付の入力欄はすべて同じ幅にそろえる */
   input[type=date] { width:180px !important; flex:none; }
+
+  /* ===================================================================
+   * Linear 風テーマ（以下で上の見た目を上書き）
+   * =================================================================== */
+/* ===== Linear 風テーマ ===== */
+:root {
+  --main:#5e6ad2; --main-hover:#4f5bc4; --ring:rgba(94,106,210,.28);
+  --bg:#f7f8f9; --panel:#ffffff; --line:#e6e8eb; --line-strong:#d6d9de;
+  --text:#1f2328; --text-2:#3c4149; --muted:#6b6f76; --faint:#8a8f98;
+  --ok:#2f8f5b; --ng:#d14343; --wait:#c47f17; --del:#7c5cc4;
+  --hover-line:#c4c8cf;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --sans:"Inter", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+}
+/* ダーク：パソコンの設定に合わせる（html に data-theme="light"/"dark" を付けると手動で固定できる） */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) { --bg:#0f1011; --panel:#16171a; --line:#23252a; --line-strong:#2e3036;
+  --text:#e6e7ea; --text-2:#c9cbd1; --muted:#8a8f98; --faint:#62666d;
+  --ring:rgba(122,132,230,.35); --hover-line:#3a3d44; color-scheme:dark; }
+}
+html[data-theme="dark"] { --bg:#0f1011; --panel:#16171a; --line:#23252a; --line-strong:#2e3036;
+  --text:#e6e7ea; --text-2:#c9cbd1; --muted:#8a8f98; --faint:#62666d;
+  --ring:rgba(122,132,230,.35); --hover-line:#3a3d44; color-scheme:dark; }
+body { font-family:var(--sans); background:var(--bg); color:var(--text); font-size:13px; letter-spacing:-0.005em;
+  -webkit-font-smoothing:antialiased; }
+header { background:var(--panel); color:var(--text); border-bottom:1px solid var(--line); padding:10px 20px; }
+header h1 { font-size:14px; font-weight:600; display:flex; align-items:center; gap:10px; }
+header h1::before { content:""; width:20px; height:20px; border-radius:6px;
+  background:linear-gradient(135deg,#7c86ea,#5e6ad2 55%,#4250b8); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
+#who { color:var(--text-2); font-size:12.5px; }
+#who .login { color:var(--faint); opacity:1; }
+#who .avatar { width:20px; height:20px; }
+nav { background:var(--panel); border-bottom:1px solid var(--line); padding:6px 16px; gap:2px; }
+nav button { padding:6px 12px; font-size:13px; color:var(--muted); border:none; border-radius:6px; font-family:inherit; }
+nav button:hover { background:var(--bg); color:var(--text); }
+nav button.active { background:var(--bg); color:var(--text); font-weight:500; border-bottom:none; box-shadow:inset 0 0 0 1px var(--line); }
+nav .badge { background:var(--main); font-size:11px; padding:0 6px; }
+main { margin:20px auto; }
+section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px 24px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+h2 { font-size:15px; font-weight:600; color:var(--text); margin:0 0 10px; }
+h3 { font-size:12px; font-weight:600; color:var(--muted); border-left:none; padding-left:0; margin:22px 0 10px;
+  letter-spacing:.02em; display:flex; align-items:center; gap:8px; }
+h3::after { content:""; flex:1; height:1px; background:var(--line); }
+.flow { background:var(--bg); border:1px solid var(--line); border-radius:8px; color:var(--muted); font-size:12px; }
+.flow b { color:var(--text-2); font-weight:600; }
+.grid { gap:8px 16px; grid-template-columns:160px 1fr; }
+.grid > label { color:var(--text-2); font-weight:500; font-size:12.5px; padding-top:7px; }
+.req::after { content:" 必須"; color:var(--faint); font-size:10.5px; font-weight:500; margin-left:2px; }
+input, select, textarea { font-family:inherit; font-size:13px; color:var(--text); background:var(--panel);
+  border:1px solid var(--line-strong); border-radius:6px; padding:5px 9px; height:30px; transition:border-color .12s, box-shadow .12s; }
+input:hover, select:hover { border-color:var(--hover-line); }
+input:focus, select:focus { outline:none; border-color:var(--main); box-shadow:0 0 0 3px var(--ring); }
+input::placeholder { color:var(--faint); font-style:normal; }
+input.missing { border-color:var(--ng); background:transparent; box-shadow:0 0 0 3px rgba(209,67,67,.15); }
+select { appearance:none; padding-right:26px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 13px) 12px, calc(100% - 9px) 12px; background-size:4px 4px; background-repeat:no-repeat; }
+input[type=date], #fExpires, .preview, code, .cartCode, .fUsers { font-family:var(--mono); font-size:12.5px; }
+.hint { color:var(--faint); font-size:11.5px; margin-top:4px; }
+.preview { background:var(--bg); border:1px dashed var(--line-strong); color:var(--text-2); padding:5px 10px; height:30px; border-radius:6px; letter-spacing:.02em; }
+.row { gap:6px; margin-bottom:6px; }
+.row .x { width:30px; height:30px; border-radius:6px; border:1px solid var(--line-strong); background:var(--panel); color:var(--faint); }
+.row .x:hover { color:var(--ng); border-color:var(--ng); }
+.row .unit { color:var(--faint); font-size:12px; }
+.btn { font-family:inherit; background:var(--main); color:#fff; border:1px solid var(--main); border-radius:6px;
+  padding:0 14px; height:32px; font-size:13px; font-weight:500; box-shadow:0 1px 1px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.12); }
+.btn:hover { background:var(--main-hover); }
+.btn:disabled { background:var(--line-strong); border-color:var(--line-strong); color:var(--faint); }
+.btn.sub { background:var(--panel); color:var(--text-2); border:1px solid var(--line-strong); height:28px; padding:0 10px; font-size:12.5px; box-shadow:0 1px 1px rgba(0,0,0,.04); }
+.btn.sub:hover { background:var(--bg); }
+.btn.sm { height:24px; padding:0 8px; font-size:12px; }
+.btn.warn { background:var(--panel); color:var(--ng); border:1px solid var(--line-strong); }
+.btn.warn:hover { border-color:var(--ng); }
+.btn.go { background:var(--ok); border-color:var(--ok); color:#fff; }
+.btn.plain { background:var(--panel); color:var(--text-2); border:1px solid var(--line-strong); }
+.actions { margin-top:16px; }
+.msg { border-radius:8px; font-size:12.5px; padding:9px 12px; border:1px solid; }
+.msg.ok { background:rgba(47,143,91,.07); color:var(--ok); border-color:rgba(47,143,91,.25); }
+.msg.ng { background:rgba(209,67,67,.06); color:var(--ng); border-color:rgba(209,67,67,.25); font-weight:500; }
+.msg.info { background:rgba(94,106,210,.06); color:var(--main); border-color:rgba(94,106,210,.25); }
+.result { border:1px solid rgba(196,127,23,.35); background:rgba(196,127,23,.05); border-radius:10px; }
+.result .warnline { color:var(--wait); }
+table { font-size:12.5px; }
+th { background:var(--panel); color:var(--muted); font-weight:500; font-size:11.5px; border-bottom:1px solid var(--line); padding:7px 8px; }
+td { border-bottom:1px solid var(--line); padding:7px 8px; color:var(--text-2); }
+tbody tr:hover td { background:var(--bg); }
+tr.dup td { background:rgba(209,67,67,.05); }
+.tablewrap { border:1px solid var(--line); border-radius:8px; }
+.st { font-weight:500; font-size:11.5px; padding:1px 8px 1px 7px; border-radius:999px; background:transparent !important;
+  border:1px solid var(--line-strong); color:var(--text-2) !important; display:inline-flex; align-items:center; gap:5px; }
+.st::before { content:""; width:7px; height:7px; border-radius:50%; }
+.st.done::before { background:var(--ok); }
+.st.wait::before { background:transparent; border:1.5px solid var(--wait); width:5px; height:5px; }
+.st.chg::before { background:var(--ng); }
+.st.del::before { background:var(--del); }
+.st.gone::before { background:var(--faint); }
+.sub { color:var(--faint); font-size:11px; }
+.ngtext { color:var(--ng); font-weight:500; font-size:12px; }
+.oktext { color:var(--ok); font-size:12px; }
+#cartTable .cartCode { height:26px; font-size:12px; }
+#cartTable .cartCode:not(:placeholder-shown) { background:rgba(94,106,210,.06); border-color:rgba(94,106,210,.45); }
+.toolbar select, .toolbar input { height:30px; }
+#sMsg.ok, #sMsg.ng { font-size:12.5px; border-radius:8px; }
+kbd { font-family:var(--mono); font-size:11px; padding:1px 5px; border:1px solid var(--line-strong); border-bottom-width:2px; border-radius:4px; color:var(--muted); background:var(--panel); }
+.toolbar .btn { height:30px; }
+#btnImportCsv { padding:0 12px; font-size:12.5px; }
+#lTable td:nth-child(6), #lTable td:nth-child(7), #lTable td:nth-child(8), #lTable td:nth-child(9) { white-space:nowrap; }
+#lTable th { white-space:nowrap; }
+#sMsg.ok, #sMsg.ng { font-weight:500; padding:9px 12px; border:1px solid; }
+#sMsg.ok { background:rgba(47,143,91,.07); color:var(--ok); border-color:rgba(47,143,91,.25); }
+#sMsg.ng { background:rgba(209,67,67,.06); color:var(--ng); border-color:rgba(209,67,67,.25); }
+tr.muted td { color:var(--faint); }
+.result table { background:var(--panel); }
+a.btn { line-height:24px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>🎫 検定クーポン発行ツール</h1>
+  <h1>検定クーポン発行ツール</h1>
   <span id="who"></span>
 </header>
 <nav>
