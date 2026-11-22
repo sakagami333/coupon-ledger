@@ -538,6 +538,7 @@ const cell = (v) => String(v ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ")
 const REVIEW_GUIDE = `### 確認者の方へ\n- 問題なければ「Files changed」→「Review changes」→ **Approve** を選んで送信してください。\n` +
   `- 誤りがあれば **Request changes** を選び、どの行が違うかコメントしてください。\n` +
   `- マージは発行者がツールから行います（確認者はマージしないでください）。\n\n`;
+const ISSUER_GUIDE = `### 発行者の方へ\n- 承認されたら PR をマージし、速やかに「クーポン登録ツール」から登録作業を実施してください。\n\n`;
 const marker = (obj) => `<!-- coupon-data:${b64encode(JSON.stringify(obj))} -->`;
 function prBodyIssue(recs) {
   const r0 = recs[0];
@@ -548,7 +549,7 @@ function prBodyIssue(recs) {
     `| # | コード | 検定 | 受検日 | 有効期限日 | 配布先（組織名） | 区分 | 利用者数 | メール制限 | 割引内容 | 依頼元・用途 | メモ |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n` +
     recs.map((r, i) => `| ${i + 1} | \`${r.code}\`${r.code_source === "specified" ? " 📌指定" : ""} | ${cell(productLabel(r.product))} | ${r.exam_date} | ${cell(r.expires_on || "-")} | ${cell(r.recipient_org)} | ` +
       `${cell(categoryLabel(r.category))} | ${cell(r.max_users ? r.max_users + "名" : "-")} | ${cell(r.email_restriction || "-")} | ${cell(r.discount)} | ${cell(r.requester || "-")} | ${cell(r.note || "-")} |`).join("\n") +
-    `\n\n${REVIEW_GUIDE}${marker({ kind: "issue", records: recs })}`;
+    `\n\n${REVIEW_GUIDE}${ISSUER_GUIDE}${marker({ kind: "issue", records: recs })}`;
 }
 function prBodyDelete(rec, reason) {
   const rows = [["コード", "`" + rec.code + "`"], ["検定", productLabel(rec.product)], ["区分", categoryLabel(rec.category)],
