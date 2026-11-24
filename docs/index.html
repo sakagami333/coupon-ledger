@@ -252,7 +252,8 @@ a.btn { line-height:26px; }
 /* ---- 一覧：1件を2行（1行目：項目、2行目：メモ）で表示 ---- */
 #lTable { border-collapse:collapse; }
 #lTable th, #lTable td { white-space:nowrap; }
-#lTable td { padding:7px 10px; vertical-align:middle; border-bottom:none; }
+#lTable td { padding:4px 8px; vertical-align:middle; border-bottom:none; line-height:1.4; }
+#lTable th { padding:6px 8px; }
 #lTable tbody.rec { border-top:.5px solid var(--line-strong); }
 #lTable tbody.rec:first-of-type { border-top:none; }
 #lTable tbody.rec.cont { border-top:.5px dashed var(--line); }
@@ -260,15 +261,18 @@ a.btn { line-height:26px; }
 #lTable tbody.rec:hover td { background:var(--fill-2); }
 #lTable th.num, #lTable td.num { text-align:right; }
 #lTable .c-code code { font-size:13.5px; }
-#lTable .c-org { font-weight:600; white-space:normal; min-width:120px; max-width:240px; }
+#lTable .c-org { white-space:normal; min-width:120px; max-width:240px; }
+#lTable .c-org .org-name { font-weight:600; }
 #lTable .c-date, #lTable .c-disc, #lTable td.num { font-family:var(--mono); font-size:12.5px; }
-#lTable .c-disc { font-weight:600; }
+#lTable .c-disc { font-weight:400; }
 #lTable .c-mail { color:var(--muted); font-size:12px; max-width:160px; overflow:hidden; text-overflow:ellipsis; }
-#lTable .c-note { color:var(--muted); font-size:12px; white-space:normal; padding-top:6px; padding-bottom:8px; }
+#lTable .c-note { color:var(--muted); font-size:12px; white-space:normal; padding-top:3px; padding-bottom:4px; }
 #lTable .c-note .k { color:var(--faint); font-size:11px; margin-right:8px; }
 #lTable .c-st .sub { white-space:normal; max-width:120px; }
-#lTable .sub { margin-top:2px; }
-#lTable .acts { display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+#lTable .sub { margin-top:1px; }
+#lTable .acts { display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
+#lTable .acts .btn.sm { height:22px; padding:0 8px; font-size:11.5px; line-height:22px; }
+#lTable .c-st, #lTable .c-act { padding-top:5px; padding-bottom:5px; }
 #lTable .acts .btn { margin:0; }
 #lTable tbody.cont .c-st .sub { display:none; }  /* 同じ PR の2件目以降は状態の補足を省く */
 </style>
@@ -1001,8 +1005,8 @@ function renderLedger() {
       return `<tbody class="rec${muted}${first ? "" : " cont"}"><tr class="r1">` +
         `<td rowspan="2" class="c-st">${statusCell(r)}</td>` +
         `<td rowspan="2" class="c-code"><code>${esc(r.code)}</code>${r.code_source === "specified" ? `<div class="sub">📌指定コード</div>` : ""}</td>` +
-        `<td rowspan="2" class="c-org">${esc(r.recipient_org)}</td>` +
-        `<td>${esc(productLabel(r.product))}<div class="sub">${esc(categoryLabel(r.category))}</div></td>` +
+        `<td rowspan="2" class="c-org"><div class="org-name">${esc(r.recipient_org)}</div><div class="sub">${esc(categoryLabel(r.category))}</div></td>` +
+        `<td>${esc(productLabel(r.product))}</td>` +
         `<td class="num">${r.max_users ? esc(r.max_users) : ""}</td>` +
         `<td class="c-mail">${esc(r.email_restriction || "")}</td>` +
         `<td class="c-date">${esc(mdShort(r.exam_date))}</td>` +
