@@ -249,6 +249,28 @@ a.btn { line-height:26px; }
 .toolbar .btn { line-height:32px; height:32px; font-size:13px; padding:0 12px; border-radius:8px; }
 #lTable th { white-space:nowrap; }
 #lTable td:nth-child(6), #lTable td:nth-child(7), #lTable td:nth-child(8), #lTable td:nth-child(9) { white-space:nowrap; }
+/* ---- 一覧：1件を2行（1行目：項目、2行目：メモ）で表示 ---- */
+#lTable { border-collapse:collapse; }
+#lTable th, #lTable td { white-space:nowrap; }
+#lTable td { padding:7px 10px; vertical-align:middle; border-bottom:none; }
+#lTable tbody.rec { border-top:.5px solid var(--line-strong); }
+#lTable tbody.rec:first-of-type { border-top:none; }
+#lTable tbody.rec.cont { border-top:.5px dashed var(--line); }
+#lTable tr.r1 td:not([rowspan]) { border-bottom:.5px solid var(--line); }
+#lTable tbody.rec:hover td { background:var(--fill-2); }
+#lTable th.num, #lTable td.num { text-align:right; }
+#lTable .c-code code { font-size:13.5px; }
+#lTable .c-org { font-weight:600; white-space:normal; min-width:120px; max-width:240px; }
+#lTable .c-date, #lTable .c-disc, #lTable td.num { font-family:var(--mono); font-size:12.5px; }
+#lTable .c-disc { font-weight:600; }
+#lTable .c-mail { color:var(--muted); font-size:12px; max-width:160px; overflow:hidden; text-overflow:ellipsis; }
+#lTable .c-note { color:var(--muted); font-size:12px; white-space:normal; padding-top:6px; padding-bottom:8px; }
+#lTable .c-note .k { color:var(--faint); font-size:11px; margin-right:8px; }
+#lTable .c-st .sub { white-space:normal; max-width:120px; }
+#lTable .sub { margin-top:2px; }
+#lTable .acts { display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+#lTable .acts .btn { margin:0; }
+#lTable tbody.cont .c-st .sub { display:none; }  /* 同じ PR の2件目以降は状態の補足を省く */
 </style>
 </head>
 <body>
@@ -771,7 +793,7 @@ function renderCart() {
       `<td class="nw">${esc(it.exam_date)}</td><td class="nw">${esc(it.expires_on || "")}</td><td>${esc(it.recipient_org)}</td>` +
       `<td>${esc(categoryLabel(it.category))}</td><td class="nw" style="text-align:right">${it.max_users ? esc(it.max_users) + "名" : ""}</td>` +
       `<td>${esc(it.email_restriction || "")}</td>` +
-      `<td>${esc(it.discount)}</td><td>${esc(it.requester)}</td><td>${esc(it.note)}</td></tr>`).join("") + "</tbody>";
+      `<td>${esc(discountShort(it))}</td><td>${esc(it.requester)}</td><td>${esc(it.note)}</td></tr>`).join("") + "</tbody>";
 }
 
 // まとめて発行（1つの PR）
@@ -954,18 +976,43 @@ function actionCell(r) {
   if (["wait","chg","del"].includes(r.status) && mine) a.push(`<button class="btn sm warn" data-act="withdraw" data-code="${esc(r.code)}">取り下げ${many}</button>`);
   if (r.status === "done") a.push(`<button class="btn sm sub" data-copy="${esc(r.code)}">コードをコピー</button>`,
                                `<button class="btn sm warn" data-act="delete" data-code="${esc(r.code)}">削除申請</button>`);
-  return a.join("<br>");
+  return `<div class="acts">${a.join("")}</div>`;   // 縦に並べる
 }
+// 割引を短く表示（20% / 3,000円）
+function discountShort(r) {
+  const d = r.discount_type ? { type: r.discount_type, value: Number(r.discount_value) } : discountOf(r.discount);
+  if (d.type === "percent" && d.value > 0) return `${d.value}%`;
+  if (d.type === "fixed_cart" && d.value > 0) return `${d.value.toLocaleString("ja-JP")}円`;
+  return r.discount || "";
+}
+const mdShort = (iso) => { if (!iso) return ""; const [y, m, d] = String(iso).slice(0, 10).split("-"); return `${y}/${m}/${d}`; };
 function renderLedger() {
-  const q = $("lSearch").value.trim();
   const rows = visibleRecords();
-  $("lTable").innerHTML = `<thead><tr><th>状態</th><th>コード</th><th>配布先</th><th>利用者数</th><th>検定</th><th>受検日</th><th>有効期限日</th><th>依頼元・用途</th><th>割引</th><th>発行者・発行日時</th><th>メモ</th><th>操作</th></tr></thead><tbody>` +
-    rows.map(r => `<tr class="${r.status === "gone" ? "muted" : ""}">` +
-      `<td>${statusCell(r)}</td><td><code>${esc(r.code)}</code>${r.code_source === "specified" ? `<div class="sub">📌指定コード</div>` : ""}</td><td>${esc(r.recipient_org)}${r.email_restriction ? `<div class="sub">メール制限：${esc(r.email_restriction)}</div>` : ""}</td>` +
-      `<td class="nw" style="text-align:right">${r.max_users ? esc(r.max_users) + "名" : ""}</td>` +
-      `<td>${esc(productLabel(r.product))}</td><td class="nw">${esc(r.exam_date)}</td><td class="nw">${esc(r.expires_on || "")}</td><td>${esc(r.requester)}</td>` +
-      `<td>${esc(r.discount)}</td><td>${esc(r.issued_by)}<div class="sub">${esc(r.issued_at)}</div></td><td>${esc(r.note)}</td>` +
-      `<td>${actionCell(r)}</td></tr>`).join("") + "</tbody>";
+  // 同じ PR のまとまりは、操作ボタンを先頭の行にだけ出す
+  let prevPr = null;
+  const login = (by) => { const m = String(by || "").match(/\(([^)]+)\)\s*$/); return m ? m[1] : String(by || ""); };
+  $("lTable").innerHTML = `<thead><tr><th>状態</th><th>コード</th><th>配布先</th><th>検定</th><th class="num">人数</th><th>メール制限</th>` +
+    `<th>受検日</th><th>期限</th><th>依頼元</th><th class="num">割引</th><th>発行者</th><th>操作</th></tr></thead>` +
+    rows.map(r => {
+      const groupKey = r.pr && r.status !== "done" ? `${r.pr.number}:${r.status === "del" ? r.code : "g"}` : null;
+      const first = !groupKey || groupKey !== prevPr; prevPr = groupKey;
+      const muted = r.status === "gone" ? " muted" : "";
+      // 1件 = 2行。状態・コード・配布先・操作は2行ぶんの高さ、メモは2行目に横長で表示
+      return `<tbody class="rec${muted}${first ? "" : " cont"}"><tr class="r1">` +
+        `<td rowspan="2" class="c-st">${statusCell(r)}</td>` +
+        `<td rowspan="2" class="c-code"><code>${esc(r.code)}</code>${r.code_source === "specified" ? `<div class="sub">📌指定コード</div>` : ""}</td>` +
+        `<td rowspan="2" class="c-org">${esc(r.recipient_org)}</td>` +
+        `<td>${esc(productLabel(r.product))}<div class="sub">${esc(categoryLabel(r.category))}</div></td>` +
+        `<td class="num">${r.max_users ? esc(r.max_users) : ""}</td>` +
+        `<td class="c-mail">${esc(r.email_restriction || "")}</td>` +
+        `<td class="c-date">${esc(mdShort(r.exam_date))}</td>` +
+        `<td class="c-date">${esc(mdShort(r.expires_on))}</td>` +
+        `<td>${esc(r.requester || "")}</td>` +
+        `<td class="num c-disc">${esc(discountShort(r))}</td>` +
+        `<td class="c-by" title="${esc(r.issued_by)}　${esc(r.issued_at)}">${esc(login(r.issued_by))}</td>` +
+        `<td rowspan="2" class="c-act">${first ? actionCell(r) : `<span class="sub">↑ 同じ PR #${r.pr.number}</span>`}</td>` +
+        `</tr><tr class="r2"><td colspan="8" class="c-note"><span class="k">メモ</span>${esc(r.note || "—")}</td></tr></tbody>`;
+    }).join("");
   $("lCount").textContent = `${rows.length} 件表示（全 ${records.length} 件）　新しい順`;
 }
 async function reloadLedger() {
