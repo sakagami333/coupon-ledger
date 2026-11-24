@@ -965,7 +965,7 @@ const FILTERS = { active: s => s !== "gone", wait: s => s === "wait" || s === "c
 function statusCell(r) {
   const cls = { done: "done", wait: "wait", chg: "chg", del: "del", gone: "gone" }[r.status];
   let sub = "";
-  if (r.rs && (r.status === "wait" || r.status === "del")) sub = r.rs.approved ? `承認：${r.rs.approvers.join("、")}` : "確認者の承認待ち";
+  if (r.rs && (r.status === "wait" || r.status === "del")) sub = r.rs.approved ? `承認：${r.rs.approvers.join("、")}` : "";
   if (r.status === "chg") sub = `修正依頼：${r.rs.changers.join("、")}（PR のコメントを確認）`;
   if (r.status === "del" && r.reason) sub += `<br>理由：${esc(r.reason)}`;
   return `<span class="st ${cls}">${STATUS_TEXT[r.status]}</span>${sub ? `<div class="sub">${sub}</div>` : ""}`;
