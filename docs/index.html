@@ -320,7 +320,7 @@ a.btn { line-height:26px; }
 
     <label class="req">有効期限日</label>
     <div><div id="expiresView" class="ro">—</div><input type="hidden" id="fExpires">
-      <div class="hint">検定ごとに登録された日付が付きます（変更できません）</div></div>
+      <div class="hint">検定ごとに登録された日付が付きます（変更できません）。期限日の 0:00 になった時点で使えなくなります</div></div>
 
     <label for="fRequester">依頼元・用途</label>
     <div><input id="fRequester" list="requesterList" placeholder="例）営業部"><datalist id="requesterList"></datalist>
@@ -708,7 +708,8 @@ function applyExam() {
   const today = ymd(new Date());
   $("fProduct").innerHTML = e ? `<option value="${esc(e.product)}">${esc(e.product)}</option>` : "";
   $("fExpires").value = e ? e.expires : "";
-  $("expiresView").textContent = e ? dateLabel(e.expires) : "—";
+  // 取り込み先では期限日の 0:00 で失効するため、時刻まで明示する（データは日付のみ）
+  $("expiresView").textContent = e ? `${dateLabel(e.expires)} 0:00まで` : "—";
   $("dateList").innerHTML = e
     ? [...e.dates].sort().map(d => d < today
         ? `<label class="chk off"><input type="checkbox" disabled> ${esc(dateLabel(d))}（終了）</label>`
