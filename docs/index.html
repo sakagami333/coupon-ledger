@@ -281,6 +281,16 @@ a.btn { line-height:26px; }
 .datechk .chk input { width:16px; height:16px; accent-color:var(--main); }
 .datechk .chk.off { color:var(--faint); cursor:default; }
 .ro { font-family:var(--mono); font-size:13px; padding:6px 0; color:var(--text); }
+/* ---- 検定別・抽出 ---- */
+#xTable td { vertical-align:middle; padding:6px 8px; }
+#xTable th, #xTable td { white-space:nowrap; }
+#xTable .org-name { font-weight:600; }
+#xTable td.num, #xTable th.num { text-align:right; font-family:var(--mono); }
+#xTable .acts { display:flex; flex-wrap:wrap; gap:4px; }
+#xTable .acts .btn.sm { height:24px; font-size:12px; }
+.chkline { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); }
+.chkline input { width:16px; height:16px; accent-color:var(--main); }
+#lExam { width:auto; max-width:260px; }
 </style>
 </head>
 <body>
@@ -291,6 +301,7 @@ a.btn { line-height:26px; }
 <nav><span class="navwrap">
   <button data-tab="issue" class="active">① クーポンを発行する</button>
   <button data-tab="ledger">② 発行済み一覧・確認状況 <span id="waitBadge" class="badge" style="display:none"></span></button>
+  <button data-tab="exams">③ 検定別・抽出</button>
   <button data-tab="settings">⚙ 設定</button>
 </span></nav>
 
@@ -360,6 +371,7 @@ a.btn { line-height:26px; }
       <option value="gone">取り下げ</option>
       <option value="all">すべて</option>
     </select>
+    <select id="lExam"><option value="">すべての検定</option></select>
     <input type="search" id="lSearch" placeholder="コード・組織名・依頼元などで検索">
     <button class="btn sub" id="btnReload">最新にする</button>
     <button class="btn sub" id="btnCsv">台帳CSV（Excel用）</button>
@@ -368,6 +380,18 @@ a.btn { line-height:26px; }
   <div class="hint" id="lCount"></div>
   <div id="lMsg" class="msg"></div>
   <div class="tablewrap"><table id="lTable"></table></div>
+</section>
+
+<!-- 検定別・抽出 -->
+<section id="tab-exams">
+  <h2>検定別・抽出</h2>
+  <div class="flow">検定ごとに、確定したクーポンを取り込み用CSVで抽出します。抽出すると記録が残り、次回は<b>まだ抽出していない分</b>だけを出せます。</div>
+  <div class="toolbar">
+    <label class="chkline"><input type="checkbox" id="xShowPast"> 終了した検定も表示</label>
+    <button class="btn sub" id="btnExamReload">最新にする</button>
+  </div>
+  <div id="xMsg" class="msg"></div>
+  <div class="tablewrap"><table id="xTable"></table></div>
 </section>
 
 <!-- 設定 -->
@@ -414,6 +438,7 @@ const DEFAULT_SETTINGS = {
   branch: "main",
   dir: "coupons",
   config: "coupons/config.json",
+  exportBranch: "coupon-exports",   // 抽出の記録を置くブランチ（main とは別。ブランチ保護をかけない）
 };
 
 // config.json が無いときの選択肢
@@ -547,6 +572,18 @@ class GitHub {
   putFile(p, text, branch, message) { return this.call("PUT", `${this.repo}/contents/${this.path(p)}`, { message, content: b64encode(text), branch }); }
   deleteFile(p, sha, branch, message) { return this.call("DELETE", `${this.repo}/contents/${this.path(p)}`, { message, sha, branch }); }
   tree(branch) { return this.call("GET", `${this.repo}/git/trees/${this.path(branch)}?recursive=1`); }
+  async treeOrNull(branch) {
+    const t = await this.call("GET", `${this.repo}/git/trees/${this.path(branch)}?recursive=1`, null, [404, 409]);
+    return t && Array.isArray(t.tree) ? t : null;
+  }
+  async ensureBranch(name) {   // なければ main から作る
+    const r = await this.call("GET", `${this.repo}/git/ref/heads/${this.path(name)}`, null, [404]);
+    if (r && r.object) return;
+    await this.createBranch(name, await this.headSha(this.s.branch));
+  }
+  updateFile(p, text, branch, message, sha) {
+    return this.call("PUT", `${this.repo}/contents/${this.path(p)}`, { message, content: b64encode(text), branch, ...(sha ? { sha } : {}) });
+  }
   async blob(sha) { return b64decode((await this.call("GET", `${this.repo}/git/blobs/${sha}`)).content); }
   async pulls(state, pages = 10) {
     const all = [];
@@ -614,19 +651,72 @@ function reviewState(pr, reviews) {
 }
 
 /* ---------- 一覧の読み込み ---------- */
+/* ---------- 検定ごとのまとまりと、抽出の記録 ---------- */
+const UNASSIGNED = "_unassigned";
+// クーポンがどの検定に属するか（記録の exam_id → 保存フォルダ → 検定なし）
+function examIdOf(r) {
+  if (r.exam_id) return r.exam_id;
+  if (r._folder && !/^\d{4}$/.test(r._folder)) return r._folder;
+  return UNASSIGNED;
+}
+function examName(id) {
+  if (id === UNASSIGNED) return "検定なし（試験データなど）";
+  const e = (cfg.exams || []).find(x => x.id === id);
+  return e ? (e.name || id) : id;
+}
+let exportLogs = {};        // 検定id → { path, sha, data:{ exam_id, exports:[{at,by,mode,count,codes}] } }
+let exportedAt = new Map(); // コード → 最後に抽出した日時
+const exportPath = (id) => `${settings.dir}/_exports/${id}.json`;
+async function loadExportLogs() {
+  exportLogs = {}; exportedAt = new Map();
+  const t = await gh.treeOrNull(settings.exportBranch);
+  if (!t) return;
+  const files = t.tree.filter(f => f.type === "blob" && f.path.startsWith(`${settings.dir}/_exports/`) && f.path.endsWith(".json"));
+  await pMap(files, async (f) => {
+    const data = JSON.parse(await gh.blob(f.sha));
+    const id = f.path.split("/").pop().replace(/\.json$/, "");
+    exportLogs[id] = { path: f.path, sha: f.sha, data };
+    for (const ex of data.exports || []) for (const c of ex.codes || []) {
+      if (!exportedAt.has(c) || exportedAt.get(c) < ex.at) exportedAt.set(c, ex.at);
+    }
+  });
+}
+// 抽出した記録を、検定ごとのファイルに追記する（main とは別のブランチなので PR は不要）
+async function recordExport(examId, codes, mode) {
+  await gh.ensureBranch(settings.exportBranch);
+  const path = exportPath(examId);
+  for (let attempt = 1; ; attempt++) {
+    const cur = await gh.readFile(path, settings.exportBranch);
+    const data = cur ? JSON.parse(cur.text) : { exam_id: examId, exam_name: examName(examId), exports: [] };
+    data.exports.push({ at: nowIso(), by: me.label, mode, count: codes.length, codes });
+    try {
+      await gh.updateFile(path, JSON.stringify(data, null, 2) + "\n", settings.exportBranch,
+        `抽出記録: ${examName(examId)} ${codes.length}件 by ${me.label}`, cur && cur.sha);
+      exportLogs[examId] = { path, sha: null, data };
+      break;
+    } catch (e) {
+      if ((e.status === 409 || e.status === 422) && attempt < 5) { await sleep(300 * attempt); continue; }
+      throw e;
+    }
+  }
+  for (const c of codes) exportedAt.set(c, nowIso());
+}
+
 async function loadRecords() {
   const [tree, open, closed] = await Promise.all([gh.tree(settings.branch), gh.pulls("open"), gh.pulls("closed", 1)]);
   if (tree.truncated) console.warn("tree truncated");
-  const re = new RegExp(`^${settings.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/\\d{4}/[^/]+\\.json$`);
+  // クーポンは「フォルダ/検定id/コード.json」（以前の「フォルダ/発行年/コード.json」も読む）。_exports は除く
+  const re = new RegExp(`^${settings.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/(?!_exports/)[^/]+/[^/]+\\.json$`);
   const files = tree.tree.filter(t => t.type === "blob" && re.test(t.path));
   // ファイルの中身は変わらない（sha が同じなら同じ内容）ので、ブラウザに覚えておいて通信を減らす
   const recs = await pMap(files, async (f) => {
     const key = "coupon.blob:" + f.sha;
     let rec = store.get(key, null);
     if (!rec) { rec = JSON.parse(await gh.blob(f.sha)); store.set(key, rec); }
-    return { ...rec, _path: f.path, _sha: f.sha, status: "done" };
+    return { ...rec, _path: f.path, _sha: f.sha, _folder: f.path.split("/").slice(-2, -1)[0], status: "done" };
   });
   const byCode = new Map(recs.map(r => [r.code, r]));
+  await loadExportLogs().catch(e => console.warn("export log", e));
   const openReviews = await pMap(open, pr => gh.reviews(pr.number), 4);
   open.forEach((pr, i) => {
     const d = parsePr(pr); if (!d) return;
@@ -877,7 +967,7 @@ async function issueBatch() {
         discount_value: it.discount_value, note: it.note };
     });
     const branch = `coupon/${issuedAt.replace(/\D/g, "")}-${randomString(4, cfg.randomChars)}`;
-    await gh.commitFiles(branch, recs.map(r => ({ path: `${settings.dir}/${year}/${r.code}.json`, text: JSON.stringify(r, null, 2) + "\n" })),
+    await gh.commitFiles(branch, recs.map(r => ({ path: `${settings.dir}/${r.exam_id || UNASSIGNED}/${r.code}.json`, text: JSON.stringify(r, null, 2) + "\n" })),
       `クーポン発行 ${recs.length}件`);
     let pr;
     try {
@@ -955,7 +1045,7 @@ async function mergePr(code) {
     if (!isDel) {
       const b = document.createElement("button"); b.className = "btn sm go"; b.style.marginLeft = "12px";
       b.textContent = `この ${n} 件の取り込み用CSVをダウンロード`;
-      b.onclick = () => downloadImportCsv(records.filter(x => batchCodes.has(x.code)), `pr${cur.pr.number}`);
+      b.onclick = () => exportAndRecord(records.filter(x => batchCodes.has(x.code)), `pr${cur.pr.number}`, "after-merge");
       $("lMsg").appendChild(b);
     }
   } catch (e) {
@@ -1014,6 +1104,7 @@ function statusCell(r) {
   if (r.rs && (r.status === "wait" || r.status === "del")) sub = r.rs.approved ? `承認：${r.rs.approvers.join("、")}` : "";
   if (r.status === "chg") sub = `修正依頼：${r.rs.changers.join("、")}（PR のコメントを確認）`;
   if (r.status === "del" && r.reason) sub += `<br>理由：${esc(r.reason)}`;
+  if (r.status === "done" && exportedAt.has(r.code)) sub = `抽出済 ${esc(String(exportedAt.get(r.code)).slice(5, 10).replace("-", "/"))}`;
   return `<span class="st ${cls}">${STATUS_TEXT[r.status]}</span>${sub ? `<div class="sub">${sub}</div>` : ""}`;
 }
 function actionCell(r) {
@@ -1037,6 +1128,7 @@ function discountShort(r) {
 }
 const mdShort = (iso) => { if (!iso) return ""; const [y, m, d] = String(iso).slice(0, 10).split("-"); return `${y}/${m}/${d}`; };
 function renderLedger() {
+  fillExamFilter();
   const rows = visibleRecords();
   // 同じ PR のまとまりは、操作ボタンを先頭の行にだけ出す
   let prevPr = null;
@@ -1089,21 +1181,38 @@ function importProblems(r) {
   if (!/^\d{8}$/.test(exp)) p.push("有効期限");
   return p;
 }
-function downloadImportCsv(recs, label) {
+function downloadImportCsv(recs, label, msgId = "lMsg") {
   recs = recs.filter(r => r.status === "done");
-  if (!recs.length) { showMsg("lMsg", "ng", "出力できる「確定」のクーポンがありません。\n（取り込み用CSVは「確定」になったものだけが対象です。確認待ちのものは、承認されて「マージして確定」してから出力してください）"); return; }
+  if (!recs.length) { showMsg(msgId, "ng", "出力できる「確定」のクーポンがありません。\n（取り込み用CSVは「確定」になったものだけが対象です。確認待ちのものは、承認されて「マージして確定」してから出力してください）"); return false; }
   const bad = recs.map(r => [r, importProblems(r)]).filter(([, p]) => p.length);
   if (bad.length) {
-    showMsg("lMsg", "ng", `次のクーポンは取り込みに必要な項目が足りないため、出力できません。\n` +
+    showMsg(msgId, "ng", `次のクーポンは取り込みに必要な項目が足りないため、出力できません。\n` +
       bad.slice(0, 10).map(([r, p]) => `・${r.code}（${p.join("・")}がありません）`).join("\n") + (bad.length > 10 ? `\n…ほか ${bad.length - 10} 件` : "") +
       `\n削除申請して、発行し直してください。`);
-    return;
+    return false;
   }
   const q = (v) => { v = String(v ?? ""); return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
   const lines = recs.map(r => importRow(r).map(q).join(","));
   if (IMPORT_HEADER) lines.unshift("クーポンコード,割引区分,割引値,利用制限数,有効期限,メモ,メールアドレス制限");
   saveFile(lines.join("\n") + "\n", `coupon-import-${label || ymd(new Date()).replace(/-/g, "")}.csv`, "text/csv;charset=utf-8");
-  showMsg("lMsg", "ok", `取り込み用 CSV（${recs.length} 件）をダウンロードしました。`);
+  showMsg(msgId, "ok", `取り込み用 CSV（${recs.length} 件）をダウンロードしました。`);
+  return true;
+}
+// 取り込み用CSVを出し、検定ごとに抽出の記録を残す
+async function exportAndRecord(recs, label, mode = "manual", msgId = "lMsg") {
+  recs = recs.filter(r => r.status === "done");
+  if (!downloadImportCsv(recs, label, msgId)) return false;
+  const groups = {};
+  recs.forEach(r => (groups[examIdOf(r)] = groups[examIdOf(r)] || []).push(r.code));
+  try {
+    for (const [id, codes] of Object.entries(groups)) await recordExport(id, codes, mode);
+    showMsg(msgId, "ok", `取り込み用 CSV（${recs.length} 件）をダウンロードし、抽出の記録を残しました。`);
+  } catch (e) {
+    showMsg(msgId, "ng", `CSV はダウンロードしましたが、抽出の記録を残せませんでした。\n${e.message}`);
+  }
+  if ($("tab-ledger").classList.contains("active")) renderLedger();
+  if ($("tab-exams").classList.contains("active")) renderExams();
+  return true;
 }
 // ファイルを保存する（リンクをページに置いてからクリックし、少し待ってから後片付けする）
 function saveFile(text, name, type) {
@@ -1115,7 +1224,68 @@ function saveFile(text, name, type) {
 function visibleRecords() {
   const q = $("lSearch").value.trim().toLowerCase();
   const fil = FILTERS[$("lStatus").value];
-  return records.filter(r => fil(r.status) && (!q || COLUMNS.some(c => String(r[c] ?? "").toLowerCase().includes(q))));
+  const ex = $("lExam").value;
+  return records.filter(r => fil(r.status) && (!ex || examIdOf(r) === ex) && (!q || COLUMNS.some(c => String(r[c] ?? "").toLowerCase().includes(q))));
+}
+/* ---------- 検定別・抽出 ---------- */
+function examGroups() {
+  const today = ymd(new Date());
+  const ids = new Set((cfg.exams || []).map(e => e.id));
+  records.forEach(r => ids.add(examIdOf(r)));
+  return [...ids].map(id => {
+    const e = (cfg.exams || []).find(x => x.id === id);
+    const recs = records.filter(r => examIdOf(r) === id);
+    const done = recs.filter(r => r.status === "done");
+    const notExported = done.filter(r => !exportedAt.has(r.code));
+    const log = exportLogs[id]?.data?.exports || [];
+    const last = log.length ? log[log.length - 1] : null;
+    const dates = e ? [...e.dates].sort() : [...new Set(recs.map(r => r.exam_date))].sort();
+    const finished = e ? dates[dates.length - 1] < today : true;
+    return { id, e, recs, done, notExported, pending: recs.filter(r => ["wait", "chg"].includes(r.status)),
+      deleting: recs.filter(r => r.status === "del"), last, dates, finished };
+  }).filter(g => g.recs.some(r => r.status !== "gone") || (g.e && !g.finished))
+    .sort((a, b) => (a.id === UNASSIGNED) - (b.id === UNASSIGNED) || String(b.dates[0] || "").localeCompare(String(a.dates[0] || "")));
+}
+function renderExams() {
+  const showPast = $("xShowPast").checked;
+  const groups = examGroups().filter(g => showPast || !g.finished || g.notExported.length || g.pending.length);
+  const md = (iso) => iso ? `${+iso.slice(5, 7)}/${+iso.slice(8, 10)}` : "";
+  $("xTable").innerHTML = `<thead><tr><th>検定</th><th>受検日</th><th>期限</th><th class="num">確定</th><th class="num">未抽出</th><th class="num">確認待ち</th><th>前回の抽出</th><th>操作</th></tr></thead><tbody>` +
+    (groups.length ? groups.map(g => `<tr class="${g.finished ? "muted" : ""}">` +
+      `<td><div class="org-name">${esc(examName(g.id))}</div><div class="sub">${esc(g.id)}${g.finished && g.e ? " ・ 終了" : ""}</div></td>` +
+      `<td class="c-date">${esc(g.dates.map(md).join("・"))}</td>` +
+      `<td class="c-date">${g.e ? esc(mdShort(g.e.expires)) + " 0:00" : ""}</td>` +
+      `<td class="num">${g.done.length}</td>` +
+      `<td class="num"><b>${g.notExported.length}</b></td>` +
+      `<td class="num">${g.pending.length ? `<span class="ngtext">${g.pending.length}</span>` : "0"}${g.deleting.length ? `<div class="sub">削除待ち ${g.deleting.length}</div>` : ""}</td>` +
+      `<td>${g.last ? `${esc(String(g.last.at).slice(0, 16))}<div class="sub">${esc(String(g.last.by).replace(/\s*\(.*\)$/, ""))} ・ ${g.last.count}件</div>` : `<span class="sub">まだ抽出していません</span>`}</td>` +
+      `<td><div class="acts">` +
+        `<button class="btn sm" data-xexp="new" data-id="${esc(g.id)}" ${g.notExported.length ? "" : "disabled"}>未抽出をCSV出力（${g.notExported.length}件）</button>` +
+        `<button class="btn sm sub" data-xexp="all" data-id="${esc(g.id)}" ${g.done.length ? "" : "disabled"}>すべて出力し直す（${g.done.length}件）</button>` +
+        `<button class="btn sm plain" data-xview="${esc(g.id)}">一覧で見る</button>` +
+      `</div></td></tr>`).join("")
+    : `<tr><td colspan="8" class="hint">表示できる検定がありません。</td></tr>`) + "</tbody>";
+}
+async function exportExam(id, mode) {
+  const g = examGroups().find(x => x.id === id); if (!g) return;
+  const recs = mode === "new" ? g.notExported : g.done;
+  if (!recs.length) { showMsg("xMsg", "ng", "出力できる確定済みのクーポンがありません。"); return; }
+  let warn = "";
+  if (g.pending.length) warn += `\n\n⚠ まだ確定していないクーポン（確認待ち・差し戻し）が ${g.pending.length} 件あります。これらは今回の CSV に含まれません。`;
+  if (mode === "all" && g.done.length - g.notExported.length) warn += `\n\n⚠ すでに抽出済みの ${g.done.length - g.notExported.length} 件も含まれます。取り込み先で二重登録にならないよう注意してください。`;
+  if (!confirm(`「${examName(id)}」の${mode === "new" ? "未抽出の" : "すべての確定済み"}クーポン ${recs.length} 件を取り込み用CSVで出力し、抽出の記録を残します。${warn}`)) return;
+  await exportAndRecord(recs, `${id}${mode === "all" ? "-all" : ""}-${nowIso().replace(/\D/g, "").slice(0, 12)}`, mode, "xMsg");
+}
+async function reloadExams() {
+  showMsg("xMsg", "info", "読み込み中…");
+  try { await loadRecords(); $("xMsg").className = "msg"; renderExams(); }
+  catch (e) { showMsg("xMsg", "ng", "読み込めませんでした。\n" + e.message); }
+}
+function fillExamFilter() {
+  const keep = $("lExam").value;
+  const ids = new Set((cfg.exams || []).map(e => e.id)); records.forEach(r => ids.add(examIdOf(r)));
+  $("lExam").innerHTML = `<option value="">すべての検定</option>` + [...ids].map(id => `<option value="${esc(id)}">${esc(examName(id))}</option>`).join("");
+  if ([...ids].includes(keep)) $("lExam").value = keep;
 }
 function downloadCsv() {
   const cols = ["status", ...COLUMNS];
@@ -1210,6 +1380,7 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   if (b.dataset.tab === "ledger" && me) reloadLedger();
   if (b.dataset.tab === "issue" && me) loadRecords().then(renderCart).catch(() => {});
   if (b.dataset.tab === "settings") fillSettings();
+  if (b.dataset.tab === "exams" && me) reloadExams();
 });
 $("fExam").addEventListener("change", applyExam);
 $("btnAddOrg").onclick = () => addOrgRow("", [...document.querySelectorAll(".fCategory")].pop()?.value).querySelector("input").focus();
@@ -1249,7 +1420,19 @@ $("lSearch").addEventListener("input", renderLedger);
 $("lStatus").addEventListener("change", renderLedger);
 $("btnReload").onclick = reloadLedger;
 $("btnCsv").onclick = downloadCsv;
-$("btnImportCsv").onclick = () => downloadImportCsv(visibleRecords());
+$("btnImportCsv").onclick = () => exportAndRecord(visibleRecords(), "", "ledger");
+$("lExam").addEventListener("change", renderLedger);
+$("xShowPast").addEventListener("change", renderExams);
+$("btnExamReload").onclick = reloadExams;
+$("xTable").addEventListener("click", e => {
+  const x = e.target.closest("[data-xexp]");
+  if (x) { x.disabled = true; exportExam(x.dataset.id, x.dataset.xexp).finally(() => { x.disabled = false; }); return; }
+  const v = e.target.closest("[data-xview]");
+  if (v) {
+    document.querySelector('nav button[data-tab="ledger"]').click();
+    setTimeout(() => { fillExamFilter(); $("lExam").value = v.dataset.xview; $("lStatus").value = "active"; renderLedger(); }, 0);
+  }
+});
 $("btnSave").onclick = saveSettings;
 
 (async function boot() {
