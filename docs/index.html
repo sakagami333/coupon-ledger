@@ -275,6 +275,12 @@ a.btn { line-height:26px; }
 #lTable .c-st, #lTable .c-act { padding-top:5px; padding-bottom:5px; }
 #lTable .acts .btn { margin:0; }
 #lTable tbody.cont .c-st .sub { display:none; }  /* 同じ PR の2件目以降は状態の補足を省く */
+/* ---- 登録済みの検定：受検日のチェック・期限日の表示 ---- */
+.datechk { display:flex; flex-wrap:wrap; gap:6px 18px; padding:4px 0; }
+.datechk .chk { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:13px; cursor:pointer; }
+.datechk .chk input { width:16px; height:16px; accent-color:var(--main); }
+.datechk .chk.off { color:var(--faint); cursor:default; }
+.ro { font-family:var(--mono); font-size:13px; padding:6px 0; color:var(--text); }
 </style>
 </head>
 <body>
@@ -296,13 +302,13 @@ a.btn { line-height:26px; }
 
   <h3>1. 発行内容を入力</h3>
   <div class="grid">
-    <label for="fProduct" class="req">検定</label>
-    <div><select id="fProduct"></select></div>
+    <label for="fExam" class="req">検定</label>
+    <div><select id="fExam"></select><select id="fProduct" hidden></select>
+      <div class="hint" id="examHint">登録済みの検定から選びます。検定の登録・変更は管理者が GitHub の config.json で行います</div></div>
 
     <label class="req">受検日</label>
-    <div><div id="dateList"></div>
-      <button class="btn sm sub" id="btnAddDate" type="button">＋ 受検日を追加</button>
-      <div class="hint">今日以降の日付を選んでください。複数日開催のときは「受検日を追加」で増やします</div></div>
+    <div><div id="dateList" class="datechk"></div>
+      <div class="hint">発行する受検日にチェックを入れます（複数日開催のときは、必要な日だけ選べます）</div></div>
 
     <label class="req">配布先（組織名・区分・利用者数）</label>
     <div><div id="orgList"></div>
@@ -312,8 +318,9 @@ a.btn { line-height:26px; }
     <label for="fDiscount" class="req">割引内容</label>
     <div><select id="fDiscount"></select></div>
 
-    <label for="fExpires" class="req">有効期限日</label>
-    <div><input type="date" id="fExpires" class="dateBox"><div class="hint">この画面で追加するクーポンすべてに付きます。クーポンは申込期間中に使うため、受検日より前の日付にしてください（受検日が複数あるときは、いちばん早い受検日より前）</div></div>
+    <label class="req">有効期限日</label>
+    <div><div id="expiresView" class="ro">—</div><input type="hidden" id="fExpires">
+      <div class="hint">検定ごとに登録された日付が付きます（変更できません）</div></div>
 
     <label for="fRequester">依頼元・用途</label>
     <div><input id="fRequester" list="requesterList" placeholder="例）営業部"><datalist id="requesterList"></datalist>
@@ -430,6 +437,8 @@ const DEFAULT_CONFIG = {
     { label: "受験料 3,000円引き", type: "fixed_cart", value: 3000 },
   ],
   requesters: [ "テスト", "自部門", "営業部" ],
+  // 登録済みの検定（config.json の exams で管理）。期限日（expires）は最も早い受検日より前
+  exams: [],
   randomLength: 8,
   // 紛らわしい文字 (0,o,1,l,i) を除いた英小文字＋数字
   randomChars: "abcdefghjkmnpqrstuvwxyz23456789",
@@ -667,13 +676,46 @@ let cart = store.get("coupon.cart", []);
 const saveCart = () => store.set("coupon.cart", cart);
 
 // 入力欄（受検日・配布先）の行
-function addDateRow(value = "") {
-  const d = document.createElement("div"); d.className = "row";
-  d.innerHTML = `<input type="date" class="fDate" min="${ymd(new Date())}"><button type="button" class="x" title="この受検日を消す">×</button>`;
-  d.querySelector("input").value = value;
-  d.querySelector("input").addEventListener("input", updatePreview);
-  d.querySelector(".x").onclick = () => { d.remove(); if (!document.querySelector(".fDate")) addDateRow(); updatePreview(); };
-  $("dateList").appendChild(d); return d;
+// 登録済みの検定（config.json の exams）
+const WEEK = "日月火水木金土";
+const dateLabel = (iso) => { const d = new Date(iso + "T00:00:00"); return `${iso.replace(/-/g, "/")}（${WEEK[d.getDay()]}）`; };
+function activeExams() {   // 期限日がまだ来ていて、今日以降の受検日が残っている検定だけ
+  const today = ymd(new Date());
+  return (cfg.exams || []).filter(e => e && e.product && Array.isArray(e.dates) && e.expires >= today && e.dates.some(d => d >= today))
+    .sort((a, b) => [...a.dates].sort()[0].localeCompare([...b.dates].sort()[0]));
+}
+function examProblems(e) {
+  const p = [];
+  if (!e.id) p.push("id がありません");
+  if (!cfg.products.some(x => x.code === e.product)) p.push(`product「${e.product}」が products にありません`);
+  if (!Array.isArray(e.dates) || !e.dates.length || e.dates.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d))) p.push("dates は YYYY-MM-DD の配列で書いてください");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.expires || "")) p.push("expires は YYYY-MM-DD で書いてください");
+  else if (Array.isArray(e.dates) && e.dates.length && e.expires >= [...e.dates].sort()[0]) p.push("expires（期限日）は最も早い受検日より前にしてください");
+  return p;
+}
+function renderExamOptions() {
+  const keep = $("fExam").value;
+  const list = activeExams();
+  $("fExam").innerHTML = list.length
+    ? `<option value="">選択してください</option>` + list.map(e => `<option value="${esc(e.id)}">${esc(e.name || productLabel(e.product))}</option>`).join("")
+    : `<option value="">登録済みの検定がありません</option>`;
+  if (keep && list.some(e => e.id === keep)) $("fExam").value = keep;
+  if (!list.length) $("examHint").innerHTML = `<span class="ngtext">発行できる検定が登録されていません。管理者に config.json への登録を依頼してください</span>`;
+  applyExam();
+}
+function applyExam() {
+  const e = activeExams().find(x => x.id === $("fExam").value);
+  const today = ymd(new Date());
+  $("fProduct").innerHTML = e ? `<option value="${esc(e.product)}">${esc(e.product)}</option>` : "";
+  $("fExpires").value = e ? e.expires : "";
+  $("expiresView").textContent = e ? dateLabel(e.expires) : "—";
+  $("dateList").innerHTML = e
+    ? [...e.dates].sort().map(d => d < today
+        ? `<label class="chk off"><input type="checkbox" disabled> ${esc(dateLabel(d))}（終了）</label>`
+        : `<label class="chk"><input type="checkbox" class="fDateChk" value="${esc(d)}" checked> ${esc(dateLabel(d))}</label>`).join("")
+    : `<span class="hint">検定を選ぶと表示されます</span>`;
+  document.querySelectorAll(".fDateChk").forEach(c => c.addEventListener("change", updatePreview));
+  updatePreview();
 }
 function addOrgRow(name = "", category = "", users = "") {
   const d = document.createElement("div"); d.className = "row";
@@ -713,9 +755,10 @@ function resetCategoryOptions() {   // 選択肢を読み直したとき、行�
 
 // 発行リストに追加
 function addToCart() {
-  const product = $("fProduct").value, discount = $("fDiscount").value, dc = discountOf(discount);
+  const exam = activeExams().find(x => x.id === $("fExam").value);
+  const product = exam ? exam.product : "", discount = $("fDiscount").value, dc = discountOf(discount);
   const requester = $("fRequester").value.trim(), note = $("fNote").value.trim();
-  const dates = [...new Set([...document.querySelectorAll(".fDate")].map(i => i.value).filter(Boolean))].sort();
+  const dates = [...new Set([...document.querySelectorAll(".fDateChk:checked")].map(i => i.value))].sort();
   const orgs = [...document.querySelectorAll("#orgList .row")].map(row => {
     const inp = row.querySelector(".fOrg"); inp.value = fixOrgName(inp.value);
     return { org: inp.value, category: row.querySelector("select").value, users: row.querySelector(".fUsers").value.trim(),
@@ -723,15 +766,17 @@ function addToCart() {
   }).filter(o => o.org);
   const expires = $("fExpires").value;
   const errs = [];
-  if (!product) errs.push("検定を選んでください");
-  if (!dates.length) errs.push("受検日を1つ以上入れてください");
+  if (!exam) errs.push("検定を選んでください");
+  else if (examProblems(exam).length) errs.push(`検定「${exam.name}」の登録内容に誤りがあります（${examProblems(exam).join("、")}）。管理者に config.json の修正を依頼してください`);
+  if (exam && !dates.length) errs.push("受検日を1つ以上チェックしてください");
   const today = ymd(new Date());
   dates.filter(d => d < today).forEach(d => errs.push(`受検日が過去の日付（${d}）になっています。今日以降の日付を選んでください`));
   if (!orgs.length) errs.push("配布先（組織名）を1つ以上入れてください");
   orgs.filter(o => !cfg.categories.some(c => c.code === o.category)).forEach(o => errs.push(`「${o.org}」の区分を選んでください`));
   orgs.filter(o => !/^[1-9][0-9]*$/.test(o.users)).forEach(o => errs.push(`「${o.org}」の利用者数を 1 以上の整数で入れてください`));
   if (!["percent", "fixed_cart"].includes(dc.type) || !(dc.value > 0)) errs.push(`割引内容「${discount}」の割引区分・割引値が設定されていません（config.json を確認してください）`);
-  if (!expires) errs.push("有効期限日を入れてください");
+  if (!exam) { /* 検定を選ぶと期限日が決まるので、ここでは確認しない */ }
+  else if (!expires) errs.push("有効期限日を入れてください");
   else if (expires < today) errs.push(`有効期限日が過去の日付（${expires}）になっています`);
   // クーポンを使えるのは申込期間中（受検日より前）なので、有効期限日は最も早い受検日の前日まで
   else if (dates.length && expires >= dates[0]) errs.push(`有効期限日（${expires}）が受検日（${dates[0]}）と同じか後になっています。クーポンは申込期間中に使うものなので、受検日より前の日付にしてください`);
@@ -742,7 +787,7 @@ function addToCart() {
   const inCart = new Set(cart.map(dupKey));
   let added = 0; const skipped = [];
   for (const date of dates) for (const o of orgs) {
-    const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), product, exam_date: date,
+    const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), exam_id: exam.id, exam_name: exam.name || "", product, exam_date: date,
       category: o.category, recipient_org: o.org, max_users: +o.users, email_restriction: o.email, expires_on: expires,
       requester, discount, discount_type: dc.type, discount_value: dc.value,
       note: note || `${productLabel(product)} ${o.org}` };   // メモが空欄なら「検定 配布先名」
@@ -825,7 +870,7 @@ async function issueBatch() {
         do { code = buildCode(it.product, it.exam_date, it.category); } while (used.has(code.toLowerCase()));
         used.add(code.toLowerCase());
       }
-      return { code, code_source: source, product: it.product, exam_date: it.exam_date, category: it.category, issued_at: issuedAt,
+      return { code, code_source: source, exam_id: it.exam_id || "", exam_name: it.exam_name || "", product: it.product, exam_date: it.exam_date, category: it.category, issued_at: issuedAt,
         issued_by: me.label, recipient_org: it.recipient_org, max_users: it.max_users, email_restriction: it.email_restriction || "",
         expires_on: it.expires_on, requester: it.requester, discount: it.discount, discount_type: it.discount_type,
         discount_value: it.discount_value, note: it.note };
@@ -928,7 +973,7 @@ async function withdrawPr(code) {
     let back = false;
     if (!isDel && confirm(`取り下げた ${group.length} 件を「発行リスト」に戻しますか？\n間違っている行だけ直して（削除して）、もう一度まとめて発行できます。`)) {
       for (const g of group) cart.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        code: g.code_source === "specified" ? g.code : "", product: g.product,
+        code: g.code_source === "specified" ? g.code : "", exam_id: g.exam_id || "", exam_name: g.exam_name || "", product: g.product,
         exam_date: g.exam_date, category: g.category, recipient_org: g.recipient_org, max_users: g.max_users, expires_on: g.expires_on,
         email_restriction: g.email_restriction || "", requester: g.requester, discount: g.discount,
         discount_type: g.discount_type, discount_value: g.discount_value, note: g.note });
@@ -1087,24 +1132,27 @@ async function loadConfig() {
     catch (e) { showMsg("msg", "ng", "選択肢の設定ファイルを読めませんでした。初期値で表示します。\n" + e.message); }
   }
   const opt = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`;
-  $("fProduct").innerHTML  = cfg.products.map(p => opt(p.code, `${p.label}（${p.code}）`)).join("");
+  cfg.exams = Array.isArray(cfg.exams) ? cfg.exams : [];
+  const badExams = cfg.exams.filter(e => examProblems(e).length);
+  if (badExams.length) showMsg("msg", "ng", "config.json の検定（exams）の登録内容に誤りがあります：\n" +
+    badExams.map(e => `・${e.name || e.id || "（名前なし）"}：${examProblems(e).join("、")}`).join("\n"));
   resetCategoryOptions();
   cfg.discounts = cfg.discounts.map(normalizeDiscount);
   const bad = cfg.discounts.filter(d => !["percent", "fixed_cart"].includes(d.type) || !(d.value > 0));
   if (bad.length) showMsg("msg", "ng", "config.json の割引の設定に、割引区分（percent / fixed_cart）か割引値が正しくないものがあります：" + bad.map(d => d.label).join("、"));
   $("fDiscount").innerHTML = cfg.discounts.map(d => opt(d.label, d.label)).join("");
   $("requesterList").innerHTML = (cfg.requesters || []).map(r => `<option value="${esc(r)}">`).join("");
-  updatePreview();
+  renderExamOptions();
 }
 function updateNoteHint() {
   const org = [...document.querySelectorAll(".fOrg")].map(i => i.value.trim()).find(Boolean) || "株式会社サンプル";
-  const ex = `${productLabel($("fProduct").value)} ${fixOrgName(org)}`;
+  const ex = `${$("fProduct").value ? productLabel($("fProduct").value) : "（検定）"} ${fixOrgName(org)}`;
   $("fNote").placeholder = `空欄なら自動：${ex}`;
   $("noteHint").textContent = `空欄のままなら、配布先ごとに「検定 配布先名」（例：${ex}）が入ります。入力した場合は、入力した内容がすべての配布先に入ります`;
 }
 function updatePreview() {
   updateNoteHint();
-  const p = $("fProduct").value, c = document.querySelector(".fCategory")?.value, d = document.querySelector(".fDate")?.value;
+  const p = $("fProduct").value, c = document.querySelector(".fCategory")?.value, d = document.querySelector(".fDateChk:checked")?.value;
   $("preview").textContent = p && c ? `${p}${d ? datePart(d) : "YYMMDD"}-${c}-${"x".repeat(cfg.randomLength)}` : "";
 }
 
@@ -1162,8 +1210,7 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   if (b.dataset.tab === "issue" && me) loadRecords().then(renderCart).catch(() => {});
   if (b.dataset.tab === "settings") fillSettings();
 });
-$("fProduct").addEventListener("input", updatePreview);
-$("btnAddDate").onclick = () => addDateRow().querySelector("input").focus();
+$("fExam").addEventListener("change", applyExam);
 $("btnAddOrg").onclick = () => addOrgRow("", [...document.querySelectorAll(".fCategory")].pop()?.value).querySelector("input").focus();
 $("btnAdd").onclick = addToCart;
 $("btnIssue").onclick = () => { if (!me) { showMsg("cartMsg", "ng", "GitHub に接続できていません。設定タブを確認してください。"); return; } issueBatch(); };
@@ -1206,8 +1253,7 @@ $("btnSave").onclick = saveSettings;
 
 (async function boot() {
   cfg = DEFAULT_CONFIG;
-  $("fExpires").min = ymd(new Date());
-  addDateRow(); addOrgRow(); renderCart();
+  addOrgRow(); renderCart();
   try {
     await connect();
     loadRecords().then(renderCart).catch(() => {});    // 確認待ち件数と、発行リストの重複チェック
