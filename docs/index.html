@@ -291,6 +291,7 @@ a.btn { line-height:26px; }
 .chkline { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); }
 .chkline input { width:16px; height:16px; accent-color:var(--main); }
 #lExam { width:auto; max-width:260px; }
+#lTable .c-exam { max-width:240px; overflow:hidden; text-overflow:ellipsis; }
 </style>
 </head>
 <body>
@@ -1139,12 +1140,14 @@ function renderLedger() {
       const groupKey = r.pr && r.status !== "done" ? `${r.pr.number}:${r.status === "del" ? r.code : "g"}` : null;
       const first = !groupKey || groupKey !== prevPr; prevPr = groupKey;
       const muted = r.status === "gone" ? " muted" : "";
+      const eid = examIdOf(r);
+      const ename = r.exam_name || (eid !== UNASSIGNED ? examName(eid) : "");
       // 1件 = 2行。状態・コード・配布先・操作は2行ぶんの高さ、メモは2行目に横長で表示
       return `<tbody class="rec${muted}${first ? "" : " cont"}"><tr class="r1">` +
         `<td rowspan="2" class="c-st">${statusCell(r)}</td>` +
         `<td rowspan="2" class="c-code"><code>${esc(r.code)}</code>${r.code_source === "specified" ? `<div class="sub">📌指定コード</div>` : ""}</td>` +
         `<td rowspan="2" class="c-org"><div class="org-name">${esc(r.recipient_org)}</div><div class="sub">${esc(categoryLabel(r.category))}</div></td>` +
-        `<td>${esc(productLabel(r.product))}</td>` +
+        `<td class="c-exam" title="${esc(productLabel(r.product))}">${esc(ename || productLabel(r.product))}</td>` +
         `<td class="num">${r.max_users ? esc(r.max_users) : ""}</td>` +
         `<td class="c-mail">${esc(r.email_restriction || "")}</td>` +
         `<td class="c-date">${esc(mdShort(r.exam_date))}</td>` +
