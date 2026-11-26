@@ -270,7 +270,7 @@ a.btn { line-height:26px; }
 #lTable .c-note .k { color:var(--faint); font-size:11px; margin-right:8px; }
 #lTable .c-st .sub { white-space:normal; max-width:120px; }
 #lTable .sub { margin-top:1px; }
-#lTable .acts { display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
+#lTable .acts { display:flex; flex-wrap:wrap; align-items:center; gap:4px; max-width:150px; }  /* 最大2段（1件の2行分の高さに収まる） */
 #lTable .acts .btn.sm { height:22px; padding:0 8px; font-size:11.5px; line-height:22px; }
 #lTable .c-st, #lTable .c-act { padding-top:5px; padding-bottom:5px; }
 #lTable .acts .btn { margin:0; }
@@ -285,6 +285,11 @@ a.btn { line-height:26px; }
 .chkline input { width:16px; height:16px; accent-color:var(--main); }
 #lExam { width:auto; max-width:260px; }
 #lTable .c-exam { max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+#lTable .codeline { display:inline-flex; align-items:center; gap:4px; }
+.iconbtn { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; border:none; border-radius:6px;
+  background:transparent; color:var(--faint); cursor:pointer; }
+.iconbtn:hover { background:var(--fill); color:var(--main); }
+.iconbtn.ok { color:var(--ok-text, var(--ok)); }
 </style>
 </head>
 <body>
@@ -1081,7 +1086,7 @@ function statusCell(r) {
   const cls = { done: "done", wait: "wait", chg: "chg", del: "del", gone: "gone" }[r.status];
   let sub = "";
   if (r.rs && (r.status === "wait" || r.status === "del")) sub = r.rs.approved ? `承認：${r.rs.approvers.join("、")}` : "";
-  if (r.status === "chg") sub = `修正依頼：${r.rs.changers.join("、")}（PR のコメントを確認）`;
+  if (r.status === "chg") sub = `修正依頼：${r.rs.changers.join("、")}`;
   if (r.status === "del" && r.reason) sub += `<br>理由：${esc(r.reason)}`;
   if (r.status === "done" && exportedAt.has(r.code)) sub = `抽出済 ${esc(String(exportedAt.get(r.code)).slice(5, 10).replace("-", "/"))}`;
   return `<span class="st ${cls}">${STATUS_TEXT[r.status]}</span>${sub ? `<div class="sub">${sub}</div>` : ""}`;
@@ -1089,15 +1094,16 @@ function statusCell(r) {
 function actionCell(r) {
   const a = [];
   const mine = r.pr && r.pr.user?.login === me.login;
-  const many = r.prCount > 1 && r.status !== "del" ? `（${r.prCount}件）` : "";
-  if (r.pr) a.push(`<a class="btn sm plain" href="${esc(r.pr.html_url)}" target="_blank" rel="noopener">PR #${r.pr.number}${many}</a>`);
-  if ((r.status === "wait" || r.status === "del") && mine && r.rs.approved) a.push(`<button class="btn sm go" data-act="merge" data-code="${esc(r.code)}">マージして確定${many}</button>`);
-  if (r.status === "wait" && mine && !r.rs.approved) a.push(`<button class="btn sm sub" data-req="${r.pr.number}">依頼文をコピー</button>`);
-  if (["wait","chg","del"].includes(r.status) && mine) a.push(`<button class="btn sm warn" data-act="withdraw" data-code="${esc(r.code)}">取り下げ${many}</button>`);
-  if (r.status === "done") a.push(`<button class="btn sm sub" data-copy="${esc(r.code)}">コードをコピー</button>`,
-                               `<button class="btn sm warn" data-act="delete" data-code="${esc(r.code)}">削除申請</button>`);
-  return `<div class="acts">${a.join("")}</div>`;   // 縦に並べる
+  const many = r.prCount > 1 && r.status !== "del" ? `${r.prCount}件まとめて` : "";
+  if (r.pr) a.push(`<a class="btn sm plain" href="${esc(r.pr.html_url)}" target="_blank" rel="noopener" title="確認依頼（PR）を GitHub で開く${many ? "：" + many : ""}">PR #${r.pr.number}</a>`);
+  if ((r.status === "wait" || r.status === "del") && mine && r.rs.approved) a.push(`<button class="btn sm go" data-act="merge" data-code="${esc(r.code)}" title="マージして確定${many ? "（" + many + "）" : ""}">確定する</button>`);
+  if (r.status === "wait" && mine && !r.rs.approved) a.push(`<button class="btn sm sub" data-req="${r.pr.number}" title="確認者への依頼文（Slack 用）をコピー">依頼文</button>`);
+  if (["wait","chg","del"].includes(r.status) && mine) a.push(`<button class="btn sm warn" data-act="withdraw" data-code="${esc(r.code)}" title="取り下げ${many ? "（" + many + "）" : ""}">取り下げ</button>`);
+  if (r.status === "done") a.push(`<button class="btn sm warn" data-act="delete" data-code="${esc(r.code)}">削除申請</button>`);
+  return `<div class="acts">${a.join("")}</div>`;
 }
+const ICON_COPY = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 3.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v6.5A1.5 1.5 0 0 0 3 11h.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+const ICON_OK = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 // 割引を短く表示（20% / 3,000円）
 function discountShort(r) {
   const d = r.discount_type ? { type: r.discount_type, value: Number(r.discount_value) } : discountOf(r.discount);
@@ -1123,7 +1129,7 @@ function renderLedger() {
       // 1件 = 2行。状態・コード・配布先・操作は2行ぶんの高さ、メモは2行目に横長で表示
       return `<tbody class="rec${muted}${first ? "" : " cont"}"><tr class="r1">` +
         `<td rowspan="2" class="c-st">${statusCell(r)}</td>` +
-        `<td rowspan="2" class="c-code"><code>${esc(r.code)}</code>${r.code_source === "specified" ? `<div class="sub">📌指定コード</div>` : ""}</td>` +
+        `<td rowspan="2" class="c-code"><span class="codeline"><code>${esc(r.code)}</code><button class="iconbtn" data-copycode="${esc(r.code)}" title="コードをコピー" aria-label="コードをコピー">${ICON_COPY}</button></span>${r.code_source === "specified" ? `<div class="sub">📌指定コード</div>` : ""}</td>` +
         `<td rowspan="2" class="c-org"><div class="org-name">${esc(r.recipient_org)}</div><div class="sub">${esc(categoryLabel(r.category))}</div></td>` +
         `<td class="c-exam" title="${esc(productLabel(r.product))}">${esc(ename || productLabel(r.product))}</td>` +
         `<td class="num">${r.max_users ? esc(r.max_users) : ""}</td>` +
@@ -1343,6 +1349,14 @@ $("cartTable").addEventListener("click", e => {
 });
 $("lTable").addEventListener("click", e => {
   const c = e.target.closest("[data-copy]"); if (c) { copy(c.dataset.copy, c); return; }
+  const cc = e.target.closest("[data-copycode]");
+  if (cc) {
+    const done = () => { cc.innerHTML = ICON_OK; cc.classList.add("ok"); setTimeout(() => { cc.innerHTML = ICON_COPY; cc.classList.remove("ok"); }, 1200); };
+    navigator.clipboard.writeText(cc.dataset.copycode).then(done).catch(() => {
+      const t = document.createElement("textarea"); t.value = cc.dataset.copycode; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); done();
+    });
+    return;
+  }
   const q = e.target.closest("[data-req]");
   if (q) { const g = records.filter(x => x.pr && x.pr.number === +q.dataset.req && x.status !== "del"); copy(requestText(g, g[0].pr), q); return; }
   const b = e.target.closest("[data-act]"); if (!b) return;
