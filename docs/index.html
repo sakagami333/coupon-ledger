@@ -386,8 +386,8 @@ a.st:hover { box-shadow:none; border-color:currentColor; }
       <div class="hint">検定ごとに登録された日付が付きます（変更できません）。期限日の 0:00 になった時点で使えなくなります</div></div>
 
     <label for="fNote">メモ</label>
-    <div><input id="fNote" placeholder="空欄なら「検定 配布先名」が自動で入ります">
-    <div class="hint" id="noteHint">空欄のままなら、配布先ごとに「検定 配布先名」（例：クラウド検定ベーシック 株式会社サンプル）が入ります。入力した場合は、入力した内容がすべての配布先に入ります</div></div>
+    <div><input id="fNote" placeholder="空欄なら「検定名 - 配布先名」が自動で入ります">
+    <div class="hint" id="noteHint">空欄のままなら、配布先ごとに「検定名 - 配布先名」（例：SCB 2027#01[2027-01-22,23] - 株式会社サンプル）が入ります。入力した場合は、入力した内容がすべての配布先に入ります</div></div>
 
     <label>コードの見本</label>
     <div class="preview" id="preview"></div>
@@ -557,12 +557,15 @@ function randomString(len, chars) {
 }
 const datePart = (iso) => { const [y, m, d] = iso.split("-"); return y.slice(2) + m + d; };
 const buildCode = (product, isoDate, category) =>
-  `${product}${datePart(isoDate)}-${category}-${randomString(cfg.randomLength, cfg.randomChars)}`;
+  `${String(product).toLowerCase()}${datePart(isoDate)}-${category}-${randomString(cfg.randomLength, cfg.randomChars)}`;
 // (株)・（株）・㈱ を「株式会社」に置き換える（保存する値にも使う）
 const fixOrgName = (s) => String(s ?? "").replace(/[(（]\s*株\s*[)）]|㈱/g, "株式会社").trim();
 // 組織名の表記ゆれ（(株)/株式会社・全角/半角・空白・大文字小文字）を吸収して比較する
 const normOrg = (s) => fixOrgName(String(s ?? "").normalize("NFKC")).replace(/\s+/g, "").toLowerCase();
-const productLabel = (code) => (cfg.products.find(p => p.code === code) || {}).label || code;
+// 検定の種類は大文字の略号（SCB / SCA / SAI）で保存する。古いデータの小文字とも同じものとして扱う
+const PCODE = (c) => String(c ?? "").toUpperCase();
+const productOf = (code) => cfg.products.find(p => PCODE(p.code) === PCODE(code));
+const productLabel = (code) => (productOf(code) || {}).label || PCODE(code);
 const categoryLabel = (code) => (cfg.categories.find(p => p.code === code) || {}).label || code;
 
 /* ---------- GitHub API ---------- */
@@ -695,10 +698,18 @@ function examIdOf(r) {
   if (r._folder && !/^\d{4}$/.test(r._folder)) return r._folder;
   return UNASSIGNED;
 }
+// 受検日の書き方：1日目は YYYY-MM-DD、2日目以降は1日目と違う部分だけ（同じ月→DD、同じ年→MM-DD）
+function datesShort(dates) {
+  const ds = [...(dates || [])].sort(); if (!ds.length) return "";
+  const [y0, m0] = ds[0].split("-");
+  return ds[0] + ds.slice(1).map(d => { const [y, m, dd] = d.split("-"); return "," + (y !== y0 ? d : m !== m0 ? `${m}-${dd}` : dd); }).join("");
+}
+// 検定名（保存用の短い形）：「SAI 2027#01[2027-01-22,23]」
+const examShort = (e) => e ? `${PCODE(e.product)} ${e.round || ""}[${datesShort(e.dates)}]`.replace("  ", " ") : "";
 function examName(id) {
   if (id === UNASSIGNED) return "検定なし（試験データなど）";
   const e = (cfg.exams || []).find(x => x.id === id);
-  return e ? (e.name || id) : id;
+  return e ? (e.round ? examShort(e) : (e.name || id)) : id;
 }
 let exportLogs = {};        // 検定id → { path, sha, data:{ exam_id, exports:[{at,by,mode,count,codes}] } }
 let exportedAt = new Map(); // コード → 最後に抽出した日時
@@ -781,11 +792,11 @@ async function loadRecords() {
 
 /* ---------- 重複チェック ---------- */
 // 同じ「受検日・組織・検定」は1枚だけ（取り下げ済みは数えない）
-const dupKey = (r) => `${r.exam_date}|${r.product}|${normOrg(r.recipient_org)}`;
+const dupKey = (r) => `${r.exam_date}|${PCODE(r.product)}|${normOrg(r.recipient_org)}`;
 function findDuplicate(rec, statuses = ["done", "wait", "chg", "del"]) {
   const key = normOrg(rec.recipient_org);
   return records.find(r => statuses.includes(r.status) && (!rec.code || r.code !== rec.code) && r.exam_date === rec.exam_date &&
-    r.product === rec.product && normOrg(r.recipient_org) === key);
+    PCODE(r.product) === PCODE(rec.product) && normOrg(r.recipient_org) === key);
 }
 const STATUS_TEXT = { done: "確定", wait: "確認待ち", chg: "差し戻し", del: "削除確認待ち", gone: "取り下げ" };
 function duplicateMessage(dup, rec) {
@@ -815,7 +826,8 @@ function activeExams() {   // 期限日がまだ来ていて、今日以降の�
 function examProblems(e) {
   const p = [];
   if (!e.id) p.push("id がありません");
-  if (!cfg.products.some(x => x.code === e.product)) p.push(`product「${e.product}」が products にありません`);
+  if (!productOf(e.product)) p.push(`product「${e.product}」が products にありません`);
+  if (!e.round) p.push("round（回次。例：2027#01）がありません");
   if (!Array.isArray(e.dates) || !e.dates.length || e.dates.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d))) p.push("dates は YYYY-MM-DD の配列で書いてください");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.expires || "")) p.push("expires は YYYY-MM-DD で書いてください");
   else if (Array.isArray(e.dates) && e.dates.length && e.expires >= [...e.dates].sort()[0]) p.push("expires（期限日）は最も早い受検日より前にしてください");
@@ -916,10 +928,10 @@ function addToCart() {
   const inCart = new Set(cart.map(dupKey));
   let added = 0; const skipped = [];
   for (const date of dates) for (const o of orgs) {
-    const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), exam_id: exam.id, exam_name: exam.name || "", product, exam_date: date,
+    const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), exam_id: exam.id, exam_name: examShort(exam), product: PCODE(product), exam_date: date,
       category: o.category, recipient_org: o.org, max_users: +o.users, email_restriction: o.email, expires_on: expires,
       discount, discount_type: dc.type, discount_value: dc.value,
-      note: note || `${productLabel(product)} ${o.org}` };   // メモが空欄なら「検定 配布先名」
+      note: note || `${examShort(exam)} - ${o.org}` };   // メモが空欄なら「検定名 - 配布先名」
     if (inCart.has(dupKey(item))) { skipped.push(`${date} ${o.org}`); continue; }
     inCart.add(dupKey(item)); cart.push(item); added++;
   }
@@ -1185,12 +1197,13 @@ function renderLedger() {
       const muted = r.status === "gone" ? " muted" : "";
       const eid = examIdOf(r);
       const ename = r.exam_name || (eid !== UNASSIGNED ? examName(eid) : "");
+      const eformal = ((cfg.exams || []).find(x => x.id === eid) || {}).name || productLabel(r.product);
       // 1件 = 2行。状態・コード・配布先・操作は2行ぶんの高さ、メモは2行目に横長で表示
       return `<tbody class="rec${muted}${first ? "" : " cont"}"><tr class="r1">` +
         `<td rowspan="2" class="c-st">${statusCell(r)}</td>` +
         `<td rowspan="2" class="c-code"><span class="codeline"><code>${esc(r.code)}</code><button class="iconbtn" data-copycode="${esc(r.code)}" title="コードをコピー" aria-label="コードをコピー">${ICON_COPY}</button></span>${r.code_source === "specified" ? `<div class="sub">📌指定コード</div>` : ""}</td>` +
         `<td rowspan="2" class="c-org"><div class="org-name">${esc(r.recipient_org)}</div><div class="sub">${esc(categoryLabel(r.category))}</div></td>` +
-        `<td class="c-exam" title="${esc(productLabel(r.product))}">${esc(ename || productLabel(r.product))}</td>` +
+        `<td class="c-exam" title="${esc(eformal)}">${esc(ename || PCODE(r.product))}</td>` +
         `<td class="num">${r.max_users ? esc(r.max_users) : ""}</td>` +
         `<td class="c-date">${esc(mdShort(r.exam_date))}</td>` +
         `<td class="c-date">${esc(mdShort(r.expires_on))}</td>` +
@@ -1222,7 +1235,7 @@ async function reloadLedger() {
  * 文字コード UTF-8（BOM なし）、見出し行なし */
 const IMPORT_HEADER = false;
 // メモに入れる検定名（config.json の products に memoName があればそれを使う）
-const memoName = (code) => { const p = cfg.products.find(x => x.code === code); return (p && (p.memoName || p.label)) || code; };
+const memoName = (code) => { const p = productOf(code); return (p && (p.memoName || p.label)) || PCODE(code); };
 function importRow(r) {
   const dc = r.discount_type ? { type: r.discount_type, value: r.discount_value } : discountOf(r.discount);
   return [r.code, dc.type, dc.value, r.max_users, String(r.expires_on || "").replace(/-/g, ""),
@@ -1304,6 +1317,8 @@ async function loadConfig() {
   }
   const opt = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`;
   cfg.exams = Array.isArray(cfg.exams) ? cfg.exams : [];
+  cfg.products = (cfg.products || []).map(x => ({ ...x, code: PCODE(x.code) }));
+  cfg.exams.forEach(e => { if (e.product) e.product = PCODE(e.product); });
   const badExams = cfg.exams.filter(e => examProblems(e).length);
   if (badExams.length) showMsg("msg", "ng", "config.json の検定（exams）の登録内容に誤りがあります：\n" +
     badExams.map(e => `・${e.name || e.id || "（名前なし）"}：${examProblems(e).join("、")}`).join("\n"));
@@ -1316,14 +1331,15 @@ async function loadConfig() {
 }
 function updateNoteHint() {
   const org = [...document.querySelectorAll(".fOrg")].map(i => i.value.trim()).find(Boolean) || "株式会社サンプル";
-  const ex = `${$("fProduct").value ? productLabel($("fProduct").value) : "（検定）"} ${fixOrgName(org)}`;
+  const e = activeExams().find(x => x.id === $("fExam").value);
+  const ex = `${e ? examShort(e) : "（検定名）"} - ${fixOrgName(org)}`;
   $("fNote").placeholder = `空欄なら自動：${ex}`;
-  $("noteHint").textContent = `空欄のままなら、配布先ごとに「検定 配布先名」（例：${ex}）が入ります。入力した場合は、入力した内容がすべての配布先に入ります`;
+  $("noteHint").textContent = `空欄のままなら、配布先ごとに「検定名 - 配布先名」（例：${ex}）が入ります。入力した場合は、入力した内容がすべての配布先に入ります`;
 }
 function updatePreview() {
   updateNoteHint();
   const p = $("fProduct").value, c = document.querySelector(".fCategory")?.value, d = document.querySelector(".fDateChk:checked")?.value;
-  $("preview").textContent = p && c ? `${p}${d ? datePart(d) : "YYMMDD"}-${c}-${"x".repeat(cfg.randomLength)}` : "";
+  $("preview").textContent = p && c ? `${String(p).toLowerCase()}${d ? datePart(d) : "YYMMDD"}-${c}-${"x".repeat(cfg.randomLength)}` : "";
 }
 
 /* ---------- 設定・接続 ---------- */
