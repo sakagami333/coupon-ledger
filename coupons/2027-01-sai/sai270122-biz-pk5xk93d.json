@@ -12,7 +12,6 @@
   "max_users": 10,
   "email_restriction": "",
   "expires_on": "2027-01-15",
-  "requester": "",
   "discount": "受験料 100%割引",
   "discount_type": "percent",
   "discount_value": 100,

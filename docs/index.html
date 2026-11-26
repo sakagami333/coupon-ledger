@@ -334,10 +334,6 @@ a.btn { line-height:26px; }
     <div><div id="expiresView" class="ro">—</div><input type="hidden" id="fExpires">
       <div class="hint">検定ごとに登録された日付が付きます（変更できません）。期限日の 0:00 になった時点で使えなくなります</div></div>
 
-    <label for="fRequester">依頼元・用途</label>
-    <div><input id="fRequester" list="requesterList" placeholder="例）営業部"><datalist id="requesterList"></datalist>
-    <div class="hint">クリックすると候補（テスト・自部門・営業部など）が出ます。自由に入力もできます</div></div>
-
     <label for="fNote">メモ</label>
     <div><input id="fNote" placeholder="空欄なら「検定 配布先名」が自動で入ります">
     <div class="hint" id="noteHint">空欄のままなら、配布先ごとに「検定 配布先名」（例：クラウド検定ベーシック 株式会社サンプル）が入ります。入力した場合は、入力した内容がすべての配布先に入ります</div></div>
@@ -350,7 +346,7 @@ a.btn { line-height:26px; }
 
   <h3 id="cartTitle">2. 発行リスト</h3>
   <div class="hint">発行リストはこのパソコンに保存されます。途中で閉じても、続きから発行できます。<br>
-  依頼元（営業部のツールなど）でコードが決まっている場合は、「コード」欄に入力してください。コードを縦に並べてコピーし、1行目の欄に貼り付けると、上から順に入ります。</div>
+  営業部のツールなどでコードが決まっている場合は、「コード」欄に入力してください。コードを縦に並べてコピーし、1行目の欄に貼り付けると、上から順に入ります。</div>
   <div class="tablewrap" style="margin-top:8px"><table id="cartTable"></table></div>
   <div class="actions">
     <button class="btn sub" id="btnClearCart">リストを空にする</button>
@@ -373,7 +369,7 @@ a.btn { line-height:26px; }
       <option value="all">すべて</option>
     </select>
     <select id="lExam"><option value="">すべての検定</option></select>
-    <input type="search" id="lSearch" placeholder="コード・組織名・依頼元などで検索">
+    <input type="search" id="lSearch" placeholder="コード・組織名・メモなどで検索">
     <button class="btn sub" id="btnReload">最新にする</button>
     <button class="btn sub" id="btnCsv">台帳CSV（Excel用）</button>
     <button class="btn" id="btnImportCsv">取り込み用CSV（表示中の確定分）</button>
@@ -462,7 +458,6 @@ const DEFAULT_CONFIG = {
     { label: "受験料 20%割引", type: "percent", value: 20 },
     { label: "受験料 3,000円引き", type: "fixed_cart", value: 3000 },
   ],
-  requesters: [ "テスト", "自部門", "営業部" ],
   // 登録済みの検定（config.json の exams で管理）。期限日（expires）は最も早い受検日より前
   exams: [],
   randomLength: 8,
@@ -471,7 +466,7 @@ const DEFAULT_CONFIG = {
 };
 
 const COLUMNS = ["code","product","exam_date","expires_on","category","issued_at","issued_by",
-  "recipient_org","max_users","email_restriction","requester","discount","discount_type","discount_value","note"];
+  "recipient_org","max_users","email_restriction","discount","discount_type","discount_value","note"];
 
 // 割引の選択肢を { label, type, value } にそろえる（"受験料 50%割引" のような文字だけの旧形式にも対応）
 function normalizeDiscount(d) {
@@ -618,16 +613,16 @@ function prBodyIssue(recs) {
   return `## 🎫 クーポン発行の確認依頼（${recs.length}件）\n\n依頼内容（メール・チャットなど）と見比べて確認してください。\n\n` +
     `- 発行者：${cell(r0.issued_by)}　発行日時：${cell(r0.issued_at)}\n` +
     (recs.some(r => r.code_source === "specified")
-      ? `- 📌指定 の付いたコードは、依頼元（営業部のツールなど）から指定されたコードです。依頼元のコードと一致しているかも確認してください。\n` : "") + `\n` +
-    `| # | コード | 検定 | 受検日 | 有効期限日 | 配布先（組織名） | 区分 | 利用者数 | メール制限 | 割引内容 | 依頼元・用途 | メモ |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n` +
+      ? `- 📌指定 の付いたコードは、営業部のツールなどで作成済みのコードです。依頼のコードと一致しているかも確認してください。\n` : "") + `\n` +
+    `| # | コード | 検定 | 受検日 | 有効期限日 | 配布先（組織名） | 区分 | 利用者数 | メール制限 | 割引内容 | メモ |\n|---|---|---|---|---|---|---|---|---|---|---|\n` +
     recs.map((r, i) => `| ${i + 1} | \`${r.code}\`${r.code_source === "specified" ? " 📌指定" : ""} | ${cell(productLabel(r.product))} | ${r.exam_date} | ${cell(r.expires_on || "-")} | ${cell(r.recipient_org)} | ` +
-      `${cell(categoryLabel(r.category))} | ${cell(r.max_users ? r.max_users + "名" : "-")} | ${cell(r.email_restriction || "-")} | ${cell(r.discount)} | ${cell(r.requester || "-")} | ${cell(r.note || "-")} |`).join("\n") +
+      `${cell(categoryLabel(r.category))} | ${cell(r.max_users ? r.max_users + "名" : "-")} | ${cell(r.email_restriction || "-")} | ${cell(r.discount)} | ${cell(r.note || "-")} |`).join("\n") +
     `\n\n${REVIEW_GUIDE}${ISSUER_GUIDE}${marker({ kind: "issue", records: recs })}`;
 }
 function prBodyDelete(rec, reason) {
   const rows = [["コード", "`" + rec.code + "`"], ["検定", productLabel(rec.product)], ["区分", categoryLabel(rec.category)],
     ["受検日", rec.exam_date], ["有効期限日", rec.expires_on || "-"], ["配布先（組織名）", rec.recipient_org],
-    ["利用者数", rec.max_users ? rec.max_users + "名" : "-"], ["メール制限", rec.email_restriction || "-"], ["依頼元・用途", rec.requester || "-"],
+    ["利用者数", rec.max_users ? rec.max_users + "名" : "-"], ["メール制限", rec.email_restriction || "-"],
     ["割引内容", rec.discount], ["メモ", rec.note || "-"], ["発行者", rec.issued_by], ["発行日時", rec.issued_at], ["削除申請者", rec.deleted_by]];
   return `## 🗑 クーポン削除の確認依頼\n\n**削除理由：** ${cell(reason)}\n\n| 項目 | 内容 |\n|---|---|\n` +
     rows.map(([k, v]) => `| ${k} | ${cell(v)} |`).join("\n") + `\n\n${REVIEW_GUIDE}${marker({ kind: "delete", records: [rec], reason })}`;
@@ -849,7 +844,7 @@ function resetCategoryOptions() {   // 選択肢を読み直したとき、行�
 function addToCart() {
   const exam = activeExams().find(x => x.id === $("fExam").value);
   const product = exam ? exam.product : "", discount = $("fDiscount").value, dc = discountOf(discount);
-  const requester = $("fRequester").value.trim(), note = $("fNote").value.trim();
+  const note = $("fNote").value.trim();
   const dates = [...new Set([...document.querySelectorAll(".fDateChk:checked")].map(i => i.value))].sort();
   const orgs = [...document.querySelectorAll("#orgList .row")].map(row => {
     const inp = row.querySelector(".fOrg"); inp.value = fixOrgName(inp.value);
@@ -881,7 +876,7 @@ function addToCart() {
   for (const date of dates) for (const o of orgs) {
     const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), exam_id: exam.id, exam_name: exam.name || "", product, exam_date: date,
       category: o.category, recipient_org: o.org, max_users: +o.users, email_restriction: o.email, expires_on: expires,
-      requester, discount, discount_type: dc.type, discount_value: dc.value,
+      discount, discount_type: dc.type, discount_value: dc.value,
       note: note || `${productLabel(product)} ${o.org}` };   // メモが空欄なら「検定 配布先名」
     if (inCart.has(dupKey(item))) { skipped.push(`${date} ${o.org}`); continue; }
     inCart.add(dupKey(item)); cart.push(item); added++;
@@ -925,7 +920,7 @@ function renderCart() {
   $("btnIssue").textContent = cart.length ? `まとめて発行して確認を依頼する（${cart.length} 件）` : "まとめて発行して確認を依頼する";
   $("btnIssue").disabled = !cart.length;
   if (!cart.length) { $("cartTable").innerHTML = `<tbody><tr><td class="hint">まだありません。上で入力して「発行リストに追加」を押してください。</td></tr></tbody>`; return; }
-  $("cartTable").innerHTML = `<thead><tr><th>#</th><th>コード（指定がある場合）</th><th>チェック</th><th></th><th>検定</th><th>受検日</th><th>有効期限日</th><th>配布先</th><th>区分</th><th>利用者数</th><th>メール制限</th><th>割引</th><th>依頼元・用途</th><th>メモ</th></tr></thead><tbody>` +
+  $("cartTable").innerHTML = `<thead><tr><th>#</th><th>コード（指定がある場合）</th><th>チェック</th><th></th><th>検定</th><th>受検日</th><th>有効期限日</th><th>配布先</th><th>区分</th><th>利用者数</th><th>メール制限</th><th>割引</th><th>メモ</th></tr></thead><tbody>` +
     cart.map((it, i) => `<tr class="${issues[i] ? "dup" : ""}"><td>${i + 1}</td>` +
       `<td><input class="cartCode" data-id="${esc(it.id)}" value="${esc(it.code || "")}" placeholder="空欄なら自動生成"></td>` +
       `<td>${issues[i] ? `<span class="ngtext">⚠ ${esc(issues[i])}</span>` : `<span class="oktext">OK</span>`}</td>` +
@@ -934,7 +929,7 @@ function renderCart() {
       `<td class="nw">${esc(it.exam_date)}</td><td class="nw">${esc(it.expires_on || "")}</td><td>${esc(it.recipient_org)}</td>` +
       `<td>${esc(categoryLabel(it.category))}</td><td class="nw" style="text-align:right">${it.max_users ? esc(it.max_users) + "名" : ""}</td>` +
       `<td>${esc(it.email_restriction || "")}</td>` +
-      `<td>${esc(discountShort(it))}</td><td>${esc(it.requester)}</td><td>${esc(it.note)}</td></tr>`).join("") + "</tbody>";
+      `<td>${esc(discountShort(it))}</td><td>${esc(it.note)}</td></tr>`).join("") + "</tbody>";
 }
 
 // まとめて発行（1つの PR）
@@ -964,7 +959,7 @@ async function issueBatch() {
       }
       return { code, code_source: source, exam_id: it.exam_id || "", exam_name: it.exam_name || "", product: it.product, exam_date: it.exam_date, category: it.category, issued_at: issuedAt,
         issued_by: me.label, recipient_org: it.recipient_org, max_users: it.max_users, email_restriction: it.email_restriction || "",
-        expires_on: it.expires_on, requester: it.requester, discount: it.discount, discount_type: it.discount_type,
+        expires_on: it.expires_on, discount: it.discount, discount_type: it.discount_type,
         discount_value: it.discount_value, note: it.note };
     });
     const branch = `coupon/${issuedAt.replace(/\D/g, "")}-${randomString(4, cfg.randomChars)}`;
@@ -1067,7 +1062,7 @@ async function withdrawPr(code) {
       for (const g of group) cart.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         code: g.code_source === "specified" ? g.code : "", exam_id: g.exam_id || "", exam_name: g.exam_name || "", product: g.product,
         exam_date: g.exam_date, category: g.category, recipient_org: g.recipient_org, max_users: g.max_users, expires_on: g.expires_on,
-        email_restriction: g.email_restriction || "", requester: g.requester, discount: g.discount,
+        email_restriction: g.email_restriction || "", discount: g.discount,
         discount_type: g.discount_type, discount_value: g.discount_value, note: g.note });
       saveCart(); back = true;
     }
@@ -1135,7 +1130,7 @@ function renderLedger() {
   let prevPr = null;
   const login = (by) => { const m = String(by || "").match(/\(([^)]+)\)\s*$/); return m ? m[1] : String(by || ""); };
   $("lTable").innerHTML = `<thead><tr><th>状態</th><th>コード</th><th>配布先</th><th>検定</th><th class="num">人数</th><th>メール制限</th>` +
-    `<th>受検日</th><th>期限</th><th>依頼元</th><th class="num">割引</th><th>発行者</th><th>操作</th></tr></thead>` +
+    `<th>受検日</th><th>期限</th><th class="num">割引</th><th>発行者</th><th>操作</th></tr></thead>` +
     rows.map(r => {
       const groupKey = r.pr && r.status !== "done" ? `${r.pr.number}:${r.status === "del" ? r.code : "g"}` : null;
       const first = !groupKey || groupKey !== prevPr; prevPr = groupKey;
@@ -1152,11 +1147,10 @@ function renderLedger() {
         `<td class="c-mail">${esc(r.email_restriction || "")}</td>` +
         `<td class="c-date">${esc(mdShort(r.exam_date))}</td>` +
         `<td class="c-date">${esc(mdShort(r.expires_on))}</td>` +
-        `<td>${esc(r.requester || "")}</td>` +
         `<td class="num c-disc">${esc(discountShort(r))}</td>` +
         `<td class="c-by" title="${esc(r.issued_by)}　${esc(r.issued_at)}">${esc(login(r.issued_by))}</td>` +
         `<td rowspan="2" class="c-act">${first ? actionCell(r) : `<span class="sub">↑ 同じ PR #${r.pr.number}</span>`}</td>` +
-        `</tr><tr class="r2"><td colspan="8" class="c-note"><span class="k">メモ</span>${esc(r.note || "—")}</td></tr></tbody>`;
+        `</tr><tr class="r2"><td colspan="7" class="c-note"><span class="k">メモ</span>${esc(r.note || "—")}</td></tr></tbody>`;
     }).join("");
   $("lCount").textContent = `${rows.length} 件表示（全 ${records.length} 件）　新しい順`;
 }
@@ -1315,7 +1309,6 @@ async function loadConfig() {
   const bad = cfg.discounts.filter(d => !["percent", "fixed_cart"].includes(d.type) || !(d.value > 0));
   if (bad.length) showMsg("msg", "ng", "config.json の割引の設定に、割引区分（percent / fixed_cart）か割引値が正しくないものがあります：" + bad.map(d => d.label).join("、"));
   $("fDiscount").innerHTML = cfg.discounts.map(d => opt(d.label, d.label)).join("");
-  $("requesterList").innerHTML = (cfg.requesters || []).map(r => `<option value="${esc(r)}">`).join("");
   renderExamOptions();
 }
 function updateNoteHint() {

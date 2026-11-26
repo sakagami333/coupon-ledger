@@ -54,11 +54,6 @@
   ],
   "randomLength": 8,
   "randomChars": "abcdefghjkmnpqrstuvwxyz23456789",
-  "requesters": [
-    "テスト",
-    "自部門",
-    "営業部"
-  ],
   "exams": [
     {
       "id": "2027-01-scb",
