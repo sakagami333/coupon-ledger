@@ -289,6 +289,13 @@ a.btn { line-height:26px; }
   background:transparent; color:var(--faint); cursor:pointer; }
 .iconbtn:hover { background:var(--fill); color:var(--main); }
 .iconbtn.ok { color:var(--ok-text, var(--ok)); }
+/* 状態ラベル：PR がある状態はリンク（#番号つき・ホバーで矢印） */
+a.st { text-decoration:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:box-shadow .12s, filter .12s; }
+a.st:hover { box-shadow:inset 0 0 0 1px currentColor; }
+.st .prno { font-family:var(--mono); font-weight:500; font-size:11px; opacity:.75; }
+.st .ext { opacity:0; margin-left:-1px; transition:opacity .12s; }
+a.st:hover .ext, a.st:focus-visible .ext { opacity:.9; }
+.okline { color:var(--ok-text, var(--ok)); }
 </style>
 </head>
 <body>
@@ -1081,20 +1088,25 @@ async function requestDelete(code) {
 
 /* ---------- 一覧の表示 ---------- */
 const FILTERS = { notexp: (s, r) => s === "done" && !exportedAt.has(r.code), active: s => s !== "gone", wait: s => s === "wait" || s === "chg", done: s => s === "done", del: s => s === "del", gone: s => s === "gone", all: () => true };
+// 状態のラベル。PR がある状態は「確認待ち #12」のようにラベル自体を PR へのリンクにする
+const ST_SHORT = { done: "確定", wait: "確認待ち", chg: "差し戻し", del: "削除待ち", gone: "取り下げ" };
+const ICON_EXT = `<svg class="ext" viewBox="0 0 12 12" width="9" height="9" aria-hidden="true"><path d="M4.5 2.5h5v5M9.5 2.5 3 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 function statusCell(r) {
-  const cls = { done: "done", wait: "wait", chg: "chg", del: "del", gone: "gone" }[r.status];
+  const cls = r.status;
   let sub = "";
-  if (r.rs && (r.status === "wait" || r.status === "del")) sub = r.rs.approved ? `承認：${r.rs.approvers.join("、")}` : "";
-  if (r.status === "chg") sub = `修正依頼：${r.rs.changers.join("、")}`;
-  if (r.status === "del" && r.reason) sub += `<br>理由：${esc(r.reason)}`;
+  if (r.rs && (r.status === "wait" || r.status === "del") && r.rs.approved) sub = `<span class="okline">✓ 承認 ${esc(r.rs.approvers.join("、"))}</span>`;
+  if (r.status === "chg") sub = `修正依頼 ${esc(r.rs.changers.join("、"))}`;
+  if (r.status === "del" && r.reason) sub += `${sub ? "<br>" : ""}理由：${esc(r.reason)}`;
   if (r.status === "done" && exportedAt.has(r.code)) sub = `抽出済 ${esc(String(exportedAt.get(r.code)).slice(5, 10).replace("-", "/"))}`;
-  return `<span class="st ${cls}">${STATUS_TEXT[r.status]}</span>${sub ? `<div class="sub">${sub}</div>` : ""}`;
+  const label = r.pr
+    ? `<a class="st ${cls}" href="${esc(r.pr.html_url)}" target="_blank" rel="noopener" title="確認依頼（PR #${r.pr.number}）を GitHub で開く">${ST_SHORT[r.status]}<span class="prno">#${r.pr.number}</span>${ICON_EXT}</a>`
+    : `<span class="st ${cls}">${ST_SHORT[r.status]}</span>`;
+  return label + (sub ? `<div class="sub">${sub}</div>` : "");
 }
 function actionCell(r) {
   const a = [];
   const mine = r.pr && r.pr.user?.login === me.login;
   const many = r.prCount > 1 && r.status !== "del" ? `${r.prCount}件まとめて` : "";
-  if (r.pr) a.push(`<a class="btn sm plain" href="${esc(r.pr.html_url)}" target="_blank" rel="noopener" title="確認依頼（PR）を GitHub で開く${many ? "：" + many : ""}">PR #${r.pr.number}</a>`);
   if ((r.status === "wait" || r.status === "del") && mine && r.rs.approved) a.push(`<button class="btn sm go" data-act="merge" data-code="${esc(r.code)}" title="マージして確定${many ? "（" + many + "）" : ""}">確定する</button>`);
   if (r.status === "wait" && mine && !r.rs.approved) a.push(`<button class="btn sm sub" data-req="${r.pr.number}" title="確認者への依頼文（Slack 用）をコピー">依頼文</button>`);
   if (["wait","chg","del"].includes(r.status) && mine) a.push(`<button class="btn sm warn" data-act="withdraw" data-code="${esc(r.code)}" title="取り下げ${many ? "（" + many + "）" : ""}">取り下げ</button>`);
@@ -1136,7 +1148,7 @@ function renderLedger() {
         `<td class="c-date">${esc(mdShort(r.expires_on))}</td>` +
         `<td class="num c-disc">${esc(discountShort(r))}</td>` +
         `<td class="c-by" title="${esc(r.issued_by)}　${esc(r.issued_at)}">${esc(login(r.issued_by))}</td>` +
-        `<td rowspan="2" class="c-act">${first ? actionCell(r) : `<span class="sub">↑ 同じ PR #${r.pr.number}</span>`}</td>` +
+        `<td rowspan="2" class="c-act">${first ? actionCell(r) : `<span class="sub">↑ 同上</span>`}</td>` +
         `</tr><tr class="r2"><td colspan="6" class="c-note"><span class="k">メモ</span>${esc(r.note || "—")}</td></tr></tbody>`;
     }).join("");
   const ex = $("lExam").value;
