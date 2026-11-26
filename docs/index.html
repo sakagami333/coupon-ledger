@@ -281,13 +281,6 @@ a.btn { line-height:26px; }
 .datechk .chk input { width:16px; height:16px; accent-color:var(--main); }
 .datechk .chk.off { color:var(--faint); cursor:default; }
 .ro { font-family:var(--mono); font-size:13px; padding:6px 0; color:var(--text); }
-/* ---- 検定別・抽出 ---- */
-#xTable td { vertical-align:middle; padding:6px 8px; }
-#xTable th, #xTable td { white-space:nowrap; }
-#xTable .org-name { font-weight:600; }
-#xTable td.num, #xTable th.num { text-align:right; font-family:var(--mono); }
-#xTable .acts { display:flex; flex-wrap:wrap; gap:4px; }
-#xTable .acts .btn.sm { height:24px; font-size:12px; }
 .chkline { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); }
 .chkline input { width:16px; height:16px; accent-color:var(--main); }
 #lExam { width:auto; max-width:260px; }
@@ -302,7 +295,6 @@ a.btn { line-height:26px; }
 <nav><span class="navwrap">
   <button data-tab="issue" class="active">① クーポンを発行する</button>
   <button data-tab="ledger">② 発行済み一覧・確認状況 <span id="waitBadge" class="badge" style="display:none"></span></button>
-  <button data-tab="exams">③ 検定別・抽出</button>
   <button data-tab="settings">⚙ 設定</button>
 </span></nav>
 
@@ -364,6 +356,7 @@ a.btn { line-height:26px; }
       <option value="active">取り下げを除く</option>
       <option value="wait">確認待ち・差し戻し</option>
       <option value="done">確定</option>
+      <option value="notexp">確定（未抽出）</option>
       <option value="del">削除確認待ち</option>
       <option value="gone">取り下げ</option>
       <option value="all">すべて</option>
@@ -377,18 +370,6 @@ a.btn { line-height:26px; }
   <div class="hint" id="lCount"></div>
   <div id="lMsg" class="msg"></div>
   <div class="tablewrap"><table id="lTable"></table></div>
-</section>
-
-<!-- 検定別・抽出 -->
-<section id="tab-exams">
-  <h2>検定別・抽出</h2>
-  <div class="flow">検定ごとに、確定したクーポンを取り込み用CSVで抽出します。抽出すると記録が残り、次回は<b>まだ抽出していない分</b>だけを出せます。</div>
-  <div class="toolbar">
-    <label class="chkline"><input type="checkbox" id="xShowPast"> 終了した検定も表示</label>
-    <button class="btn sub" id="btnExamReload">最新にする</button>
-  </div>
-  <div id="xMsg" class="msg"></div>
-  <div class="tablewrap"><table id="xTable"></table></div>
 </section>
 
 <!-- 設定 -->
@@ -669,7 +650,9 @@ async function loadExportLogs() {
   if (!t) return;
   const files = t.tree.filter(f => f.type === "blob" && f.path.startsWith(`${settings.dir}/_exports/`) && f.path.endsWith(".json"));
   await pMap(files, async (f) => {
-    const data = JSON.parse(await gh.blob(f.sha));
+    const key = "coupon.blob:" + f.sha;   // 中身は sha ごとに変わらないので、ブラウザに覚えて通信を減らす
+    let data = store.get(key, null);
+    if (!data) { data = JSON.parse(await gh.blob(f.sha)); store.set(key, data); }
     const id = f.path.split("/").pop().replace(/\.json$/, "");
     exportLogs[id] = { path: f.path, sha: f.sha, data };
     for (const ex of data.exports || []) for (const c of ex.codes || []) {
@@ -1093,7 +1076,7 @@ async function requestDelete(code) {
 }
 
 /* ---------- 一覧の表示 ---------- */
-const FILTERS = { active: s => s !== "gone", wait: s => s === "wait" || s === "chg", done: s => s === "done", del: s => s === "del", gone: s => s === "gone", all: () => true };
+const FILTERS = { notexp: (s, r) => s === "done" && !exportedAt.has(r.code), active: s => s !== "gone", wait: s => s === "wait" || s === "chg", done: s => s === "done", del: s => s === "del", gone: s => s === "gone", all: () => true };
 function statusCell(r) {
   const cls = { done: "done", wait: "wait", chg: "chg", del: "del", gone: "gone" }[r.status];
   let sub = "";
@@ -1152,7 +1135,18 @@ function renderLedger() {
         `<td rowspan="2" class="c-act">${first ? actionCell(r) : `<span class="sub">↑ 同じ PR #${r.pr.number}</span>`}</td>` +
         `</tr><tr class="r2"><td colspan="7" class="c-note"><span class="k">メモ</span>${esc(r.note || "—")}</td></tr></tbody>`;
     }).join("");
-  $("lCount").textContent = `${rows.length} 件表示（全 ${records.length} 件）　新しい順`;
+  const ex = $("lExam").value;
+  let summary = "";
+  if (ex) {   // 検定を選んでいるときは、その検定の件数をまとめて表示
+    const er = records.filter(r => examIdOf(r) === ex);
+    const done = er.filter(r => r.status === "done");
+    const notExp = done.filter(r => !exportedAt.has(r.code)).length;
+    const pend = er.filter(r => ["wait", "chg"].includes(r.status)).length;
+    const log = exportLogs[ex]?.data?.exports || [], last = log[log.length - 1];
+    summary = `　｜　この検定：確定 ${done.length} 件（未抽出 ${notExp} 件）・確認待ち ${pend} 件` +
+      (last ? `・前回の抽出 ${String(last.at).slice(0, 16)}（${last.count} 件）` : "・まだ抽出していません");
+  }
+  $("lCount").textContent = `${rows.length} 件表示（全 ${records.length} 件）　新しい順${summary}`;
 }
 async function reloadLedger() {
   $("lCount").textContent = "読み込み中…";
@@ -1208,7 +1202,6 @@ async function exportAndRecord(recs, label, mode = "manual", msgId = "lMsg") {
     showMsg(msgId, "ng", `CSV はダウンロードしましたが、抽出の記録を残せませんでした。\n${e.message}`);
   }
   if ($("tab-ledger").classList.contains("active")) renderLedger();
-  if ($("tab-exams").classList.contains("active")) renderExams();
   return true;
 }
 // ファイルを保存する（リンクをページに置いてからクリックし、少し待ってから後片付けする）
@@ -1222,61 +1215,7 @@ function visibleRecords() {
   const q = $("lSearch").value.trim().toLowerCase();
   const fil = FILTERS[$("lStatus").value];
   const ex = $("lExam").value;
-  return records.filter(r => fil(r.status) && (!ex || examIdOf(r) === ex) && (!q || COLUMNS.some(c => String(r[c] ?? "").toLowerCase().includes(q))));
-}
-/* ---------- 検定別・抽出 ---------- */
-function examGroups() {
-  const today = ymd(new Date());
-  const ids = new Set((cfg.exams || []).map(e => e.id));
-  records.forEach(r => ids.add(examIdOf(r)));
-  return [...ids].map(id => {
-    const e = (cfg.exams || []).find(x => x.id === id);
-    const recs = records.filter(r => examIdOf(r) === id);
-    const done = recs.filter(r => r.status === "done");
-    const notExported = done.filter(r => !exportedAt.has(r.code));
-    const log = exportLogs[id]?.data?.exports || [];
-    const last = log.length ? log[log.length - 1] : null;
-    const dates = e ? [...e.dates].sort() : [...new Set(recs.map(r => r.exam_date))].sort();
-    const finished = e ? dates[dates.length - 1] < today : true;
-    return { id, e, recs, done, notExported, pending: recs.filter(r => ["wait", "chg"].includes(r.status)),
-      deleting: recs.filter(r => r.status === "del"), last, dates, finished };
-  }).filter(g => g.recs.some(r => r.status !== "gone") || (g.e && !g.finished))
-    .sort((a, b) => (a.id === UNASSIGNED) - (b.id === UNASSIGNED) || String(b.dates[0] || "").localeCompare(String(a.dates[0] || "")));
-}
-function renderExams() {
-  const showPast = $("xShowPast").checked;
-  const groups = examGroups().filter(g => showPast || !g.finished || g.notExported.length || g.pending.length);
-  const md = (iso) => iso ? `${+iso.slice(5, 7)}/${+iso.slice(8, 10)}` : "";
-  $("xTable").innerHTML = `<thead><tr><th>検定</th><th>受検日</th><th>期限</th><th class="num">確定</th><th class="num">未抽出</th><th class="num">確認待ち</th><th>前回の抽出</th><th>操作</th></tr></thead><tbody>` +
-    (groups.length ? groups.map(g => `<tr class="${g.finished ? "muted" : ""}">` +
-      `<td><div class="org-name">${esc(examName(g.id))}</div><div class="sub">${esc(g.id)}${g.finished && g.e ? " ・ 終了" : ""}</div></td>` +
-      `<td class="c-date">${esc(g.dates.map(md).join("・"))}</td>` +
-      `<td class="c-date">${g.e ? esc(mdShort(g.e.expires)) + " 0:00" : ""}</td>` +
-      `<td class="num">${g.done.length}</td>` +
-      `<td class="num"><b>${g.notExported.length}</b></td>` +
-      `<td class="num">${g.pending.length ? `<span class="ngtext">${g.pending.length}</span>` : "0"}${g.deleting.length ? `<div class="sub">削除待ち ${g.deleting.length}</div>` : ""}</td>` +
-      `<td>${g.last ? `${esc(String(g.last.at).slice(0, 16))}<div class="sub">${esc(String(g.last.by).replace(/\s*\(.*\)$/, ""))} ・ ${g.last.count}件</div>` : `<span class="sub">まだ抽出していません</span>`}</td>` +
-      `<td><div class="acts">` +
-        `<button class="btn sm" data-xexp="new" data-id="${esc(g.id)}" ${g.notExported.length ? "" : "disabled"}>未抽出をCSV出力（${g.notExported.length}件）</button>` +
-        `<button class="btn sm sub" data-xexp="all" data-id="${esc(g.id)}" ${g.done.length ? "" : "disabled"}>すべて出力し直す（${g.done.length}件）</button>` +
-        `<button class="btn sm plain" data-xview="${esc(g.id)}">一覧で見る</button>` +
-      `</div></td></tr>`).join("")
-    : `<tr><td colspan="8" class="hint">表示できる検定がありません。</td></tr>`) + "</tbody>";
-}
-async function exportExam(id, mode) {
-  const g = examGroups().find(x => x.id === id); if (!g) return;
-  const recs = mode === "new" ? g.notExported : g.done;
-  if (!recs.length) { showMsg("xMsg", "ng", "出力できる確定済みのクーポンがありません。"); return; }
-  let warn = "";
-  if (g.pending.length) warn += `\n\n⚠ まだ確定していないクーポン（確認待ち・差し戻し）が ${g.pending.length} 件あります。これらは今回の CSV に含まれません。`;
-  if (mode === "all" && g.done.length - g.notExported.length) warn += `\n\n⚠ すでに抽出済みの ${g.done.length - g.notExported.length} 件も含まれます。取り込み先で二重登録にならないよう注意してください。`;
-  if (!confirm(`「${examName(id)}」の${mode === "new" ? "未抽出の" : "すべての確定済み"}クーポン ${recs.length} 件を取り込み用CSVで出力し、抽出の記録を残します。${warn}`)) return;
-  await exportAndRecord(recs, `${id}${mode === "all" ? "-all" : ""}-${nowIso().replace(/\D/g, "").slice(0, 12)}`, mode, "xMsg");
-}
-async function reloadExams() {
-  showMsg("xMsg", "info", "読み込み中…");
-  try { await loadRecords(); $("xMsg").className = "msg"; renderExams(); }
-  catch (e) { showMsg("xMsg", "ng", "読み込めませんでした。\n" + e.message); }
+  return records.filter(r => fil(r.status, r) && (!ex || examIdOf(r) === ex) && (!q || COLUMNS.some(c => String(r[c] ?? "").toLowerCase().includes(q))));
 }
 function fillExamFilter() {
   const keep = $("lExam").value;
@@ -1376,7 +1315,6 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   if (b.dataset.tab === "ledger" && me) reloadLedger();
   if (b.dataset.tab === "issue" && me) loadRecords().then(renderCart).catch(() => {});
   if (b.dataset.tab === "settings") fillSettings();
-  if (b.dataset.tab === "exams" && me) reloadExams();
 });
 $("fExam").addEventListener("change", applyExam);
 $("btnAddOrg").onclick = () => addOrgRow("", [...document.querySelectorAll(".fCategory")].pop()?.value).querySelector("input").focus();
@@ -1416,19 +1354,20 @@ $("lSearch").addEventListener("input", renderLedger);
 $("lStatus").addEventListener("change", renderLedger);
 $("btnReload").onclick = reloadLedger;
 $("btnCsv").onclick = downloadCsv;
-$("btnImportCsv").onclick = () => exportAndRecord(visibleRecords(), "", "ledger");
-$("lExam").addEventListener("change", renderLedger);
-$("xShowPast").addEventListener("change", renderExams);
-$("btnExamReload").onclick = reloadExams;
-$("xTable").addEventListener("click", e => {
-  const x = e.target.closest("[data-xexp]");
-  if (x) { x.disabled = true; exportExam(x.dataset.id, x.dataset.xexp).finally(() => { x.disabled = false; }); return; }
-  const v = e.target.closest("[data-xview]");
-  if (v) {
-    document.querySelector('nav button[data-tab="ledger"]').click();
-    setTimeout(() => { fillExamFilter(); $("lExam").value = v.dataset.xview; $("lStatus").value = "active"; renderLedger(); }, 0);
+$("btnImportCsv").onclick = () => {
+  const rows = visibleRecords().filter(r => r.status === "done");
+  const ex = $("lExam").value;
+  let warn = "";
+  const already = rows.filter(r => exportedAt.has(r.code)).length;
+  if (already) warn += `\n\n⚠ すでに抽出済みのクーポンが ${already} 件含まれます。取り込み先で二重登録にならないよう注意してください（未抽出だけを出すときは、状態を「確定（未抽出）」にしてください）。`;
+  if (ex) {
+    const pend = records.filter(r => examIdOf(r) === ex && ["wait", "chg"].includes(r.status)).length;
+    if (pend) warn += `\n\n⚠ この検定には、まだ確定していないクーポン（確認待ち・差し戻し）が ${pend} 件あります。これらは今回の CSV に含まれません。`;
   }
-});
+  if (rows.length && !confirm(`表示中の確定済みクーポン ${rows.length} 件を取り込み用CSVで出力し、抽出の記録を残します。${warn}`)) return;
+  exportAndRecord(rows, ex ? `${ex}-${nowIso().replace(/\D/g, "").slice(0, 12)}` : "", "ledger");
+};
+$("lExam").addEventListener("change", renderLedger);
 $("btnSave").onclick = saveSettings;
 
 (async function boot() {
