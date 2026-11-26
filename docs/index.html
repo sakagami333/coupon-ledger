@@ -265,7 +265,6 @@ a.btn { line-height:26px; }
 #lTable .c-org .org-name { font-weight:600; }
 #lTable .c-date, #lTable .c-disc, #lTable td.num { font-family:var(--mono); font-size:12.5px; }
 #lTable .c-disc { font-weight:400; }
-#lTable .c-mail { color:var(--muted); font-size:12px; max-width:160px; overflow:hidden; text-overflow:ellipsis; }
 #lTable .c-note { color:var(--muted); font-size:12px; white-space:normal; padding-top:3px; padding-bottom:4px; }
 #lTable .c-note .k { color:var(--faint); font-size:11px; margin-right:8px; }
 #lTable .c-st .sub { white-space:normal; max-width:120px; }
@@ -1118,7 +1117,7 @@ function renderLedger() {
   // 同じ PR のまとまりは、操作ボタンを先頭の行にだけ出す
   let prevPr = null;
   const login = (by) => { const m = String(by || "").match(/\(([^)]+)\)\s*$/); return m ? m[1] : String(by || ""); };
-  $("lTable").innerHTML = `<thead><tr><th>状態</th><th>コード</th><th>配布先</th><th>検定</th><th class="num">人数</th><th>メール制限</th>` +
+  $("lTable").innerHTML = `<thead><tr><th>状態</th><th>コード</th><th>配布先</th><th>検定</th><th class="num">人数</th>` +
     `<th>受検日</th><th>期限</th><th class="num">割引</th><th>発行者</th><th>操作</th></tr></thead>` +
     rows.map(r => {
       const groupKey = r.pr && r.status !== "done" ? `${r.pr.number}:${r.status === "del" ? r.code : "g"}` : null;
@@ -1133,13 +1132,12 @@ function renderLedger() {
         `<td rowspan="2" class="c-org"><div class="org-name">${esc(r.recipient_org)}</div><div class="sub">${esc(categoryLabel(r.category))}</div></td>` +
         `<td class="c-exam" title="${esc(productLabel(r.product))}">${esc(ename || productLabel(r.product))}</td>` +
         `<td class="num">${r.max_users ? esc(r.max_users) : ""}</td>` +
-        `<td class="c-mail">${esc(r.email_restriction || "")}</td>` +
         `<td class="c-date">${esc(mdShort(r.exam_date))}</td>` +
         `<td class="c-date">${esc(mdShort(r.expires_on))}</td>` +
         `<td class="num c-disc">${esc(discountShort(r))}</td>` +
         `<td class="c-by" title="${esc(r.issued_by)}　${esc(r.issued_at)}">${esc(login(r.issued_by))}</td>` +
         `<td rowspan="2" class="c-act">${first ? actionCell(r) : `<span class="sub">↑ 同じ PR #${r.pr.number}</span>`}</td>` +
-        `</tr><tr class="r2"><td colspan="7" class="c-note"><span class="k">メモ</span>${esc(r.note || "—")}</td></tr></tbody>`;
+        `</tr><tr class="r2"><td colspan="6" class="c-note"><span class="k">メモ</span>${esc(r.note || "—")}</td></tr></tbody>`;
     }).join("");
   const ex = $("lExam").value;
   let summary = "";
