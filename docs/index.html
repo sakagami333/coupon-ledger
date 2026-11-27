@@ -212,6 +212,10 @@ input[type=date], #fExpires, .preview, code, .cartCode, .fUsers { font-family:va
 .msg.ok { background:rgba(52,199,89,.14); color:var(--ok-text); }
 .msg.ng { background:rgba(255,59,48,.12); color:var(--ng); font-weight:500; }
 .msg.info { background:rgba(0,122,255,.10); color:var(--main); }
+.msg.nosettings { max-width:1200px; box-sizing:border-box; margin:20px auto 0; line-height:1.7; white-space:normal; }
+.msg.nosettings div { margin-top:10px; }
+.msg.nosettings button { background:var(--ng); color:#fff; border:none; border-radius:999px; padding:6px 16px; font-weight:600; cursor:pointer; }
+.nosettings-hidden .msg.nosettings { display:none; }
 .result { border:none; background:var(--panel); border-radius:12px; padding:16px; }
 .result .warnline { color:var(--wait-text); font-weight:600; }
 .result table { background:transparent; }
@@ -358,6 +362,11 @@ a.st:hover { box-shadow:none; border-color:currentColor; }
 </span></nav>
 
 <main>
+<div id="noSettings" class="msg ng nosettings">
+  <b>このブラウザには、ツールの設定（トークンなど）が保存されていません。</b>そのため GitHub に接続できず、検定やクーポンを読み込めません。<br>
+  ブラウザの「Cookie と他のサイトデータ」を消したときや、別のブラウザ・別の開き方（Pages の URL／ダウンロードしたファイル）で開いたときに起こります。
+  <div><button type="button" id="btnGoSettings">「設定」タブを開いて入力する</button></div>
+</div>
 <!-- 発行 -->
 <section id="tab-issue" class="active">
   <h2>クーポンを発行する</h2>
@@ -640,6 +649,9 @@ class GitHub {
 
 /* ---------- 状態 ---------- */
 let settings = { ...DEFAULT_SETTINGS, ...store.get("coupon.settings", {}) };
+// このブラウザに設定（オーナー・リポジトリ・トークン）が保存されているか。保存がなければ接続を試すまでもない
+const hasSavedSettings = () => { const s = store.get("coupon.settings", null); return !!(s && s.owner && s.repo && s.token); };
+function updateNoSettings() { document.body.classList.toggle("nosettings-hidden", hasSavedSettings()); }
 let gh = null, cfg = DEFAULT_CONFIG, me = null;   // me = { login, label }
 let records = [];                                 // 一覧（確定・確認待ち・削除確認待ち・取り下げ）
 
@@ -838,9 +850,11 @@ function renderExamOptions() {
   const list = activeExams();
   $("fExam").innerHTML = list.length
     ? `<option value="">選択してください</option>` + list.map(e => `<option value="${esc(e.id)}">${esc(e.name || productLabel(e.product))}</option>`).join("")
-    : `<option value="">${me ? "登録済みの検定がありません" : "GitHub に未接続のため読み込めません"}</option>`;
+    : `<option value="">${me ? "登録済みの検定がありません" : !hasSavedSettings() ? "設定がないため読み込めません" : "GitHub に未接続のため読み込めません"}</option>`;
   if (keep && list.some(e => e.id === keep)) $("fExam").value = keep;
-  if (!list.length) $("examHint").innerHTML = !me
+  if (!list.length) $("examHint").innerHTML = !hasSavedSettings()
+    ? `<span class="ngtext">このブラウザに設定が保存されていないため、検定を読み込めません。「設定」タブで入力してください</span>`
+    : !me
     ? `<span class="ngtext">GitHub に接続できていないため、検定を読み込めません。「設定」タブでトークンなどを確認してください</span>`
     : `<span class="ngtext">発行できる検定が登録されていません。管理者に config.json への登録を依頼してください</span>`;
   applyExam();
@@ -1384,7 +1398,7 @@ async function saveSettings() {
     sMsg("ng", "⚠ 次の項目が空欄です（赤枠の欄）：" + missing.map(id => SETTING_NAMES[id]).join("、") + "\n薄い文字は入力例なので、実際に入力してください。");
     return;
   }
-  store.set("coupon.settings", settings);
+  store.set("coupon.settings", settings); updateNoSettings();
   sMsg("", "接続テスト中…");
   try { await connect(); sMsg("ok", `✓ 保存しました。「${me.label}」として ${settings.owner}/${settings.repo} に接続できました。`); }
   catch (e) { $("who").innerHTML = ""; sMsg("ng", "⚠ 接続できませんでした。\n" + e.message); }
@@ -1460,9 +1474,12 @@ $("btnImportCsv").onclick = () => {
 $("lExam").addEventListener("change", renderLedger);
 $("btnSave").onclick = saveSettings;
 
+$("btnGoSettings").onclick = () => document.querySelector('nav button[data-tab="settings"]').click();
 (async function boot() {
   cfg = DEFAULT_CONFIG;
   addOrgRow(); renderCart();
+  updateNoSettings();
+  if (!hasSavedSettings()) { await loadConfig().catch(() => {}); return; }   // 設定がないので接続は試さない（上の赤い案内を表示）
   try {
     await connect();
     loadRecords().then(renderCart).catch(() => {});    // 確認待ち件数と、発行リストの重複チェック
