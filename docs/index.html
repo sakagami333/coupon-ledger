@@ -838,9 +838,11 @@ function renderExamOptions() {
   const list = activeExams();
   $("fExam").innerHTML = list.length
     ? `<option value="">選択してください</option>` + list.map(e => `<option value="${esc(e.id)}">${esc(e.name || productLabel(e.product))}</option>`).join("")
-    : `<option value="">登録済みの検定がありません</option>`;
+    : `<option value="">${me ? "登録済みの検定がありません" : "GitHub に未接続のため読み込めません"}</option>`;
   if (keep && list.some(e => e.id === keep)) $("fExam").value = keep;
-  if (!list.length) $("examHint").innerHTML = `<span class="ngtext">発行できる検定が登録されていません。管理者に config.json への登録を依頼してください</span>`;
+  if (!list.length) $("examHint").innerHTML = !me
+    ? `<span class="ngtext">GitHub に接続できていないため、検定を読み込めません。「設定」タブでトークンなどを確認してください</span>`
+    : `<span class="ngtext">発行できる検定が登録されていません。管理者に config.json への登録を依頼してください</span>`;
   applyExam();
 }
 function applyExam() {
